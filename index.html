@@ -107,9 +107,9 @@
         <h1 class="text-4xl font-bold mb-4 text-center text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-cyan-600 to-teal-600">Text Generation Demo</h1>
 
         <div class="flex flex-col lg:flex-row items-center justify-start gap-6 mb-8 mt-6">
-            <div class="p-4 bg-gradient-to-r from-blue-100 to-cyan-100 border border-blue-300 rounded-xl shadow-md w-full lg:w-auto text-center lg:text-left mb-4 lg:mb-0">
-                <span class="font-semibold text-blue-800">Prompt:</span>
-                <span id="fixedPromptDisplay" class="ml-3 font-mono text-blue-900 bg-blue-200/70 px-3 py-1 rounded-md shadow-sm"></span>
+            <div class="p-4 bg-gradient-to-r from-blue-100 to-cyan-100 border border-blue-300 rounded-xl shadow-md w-full lg:min-w-[450px] text-center lg:text-left mb-4 lg:mb-0">
+                <span class="font-semibold text-blue-800 text-lg">Prompt:</span>
+                <span id="fixedPromptDisplay" class="ml-3 font-mono text-blue-900 bg-blue-200/70 px-3 py-1 rounded-md shadow-sm text-lg"></span>
             </div>
 
              <div class="flex items-center space-x-4">
@@ -126,7 +126,9 @@
 
 
         <div id="visualizationArea" class="mt-8 space-y-6 hidden">
-            
+            {/* Heading removed */}
+            {/* <h2 class="text-2xl font-semibold text-gray-800 text-center border-b-2 border-blue-300 pb-3">Generation Process</h2> */}
+
             <div class="p-5 border-2 border-dashed border-blue-300 rounded-xl bg-blue-50/70 shadow-lg">
                 <h3 class="text-lg font-semibold text-blue-800 mb-3">Current Context (Input to Model - Subword Tokens):</h3>
                 <div id="contextDisplay" class="flex flex-wrap items-center text-lg leading-relaxed min-h-[4rem]">
