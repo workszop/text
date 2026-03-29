@@ -193,32 +193,37 @@
     };
 
     // ─── Model ────────────────────────────────────────────────────────────────
-    // T=0 greedy path  → "Einstein was a German theoretical physicist who developed the theory of relativity."
-    // T=1 sampled path → "Einstein was a renowned scientist who proposed special relativity."  (example)
+    // IMPORTANT: every token that appears as a value must also be a key in this
+    // map (or be "." or EOS_TOKEN). This keeps the generation loop closed so
+    // temperature-1 sampling can never land on a dead-end token.
+    //
+    // T=0 greedy path → "Einstein was a German theoretical physicist who
+    //                    developed the theory of relativity."
+    // T=1 variant     → "Einstein was a renowned scientist who proposed
+    //                    the theory of relativity."  (common alternate path)
     const simpleModel = {
-        "?":         [ {token:"Ein",         prob:0.45}, {token:"He",        prob:0.28}, {token:"A",         prob:0.15}, {token:"The",       prob:0.12} ],
-        "ein":       [ {token:"##stein",     prob:0.87}, {token:"##s",       prob:0.08}, {token:"##er",      prob:0.05} ],
-        "##stein":   [ {token:"was",         prob:0.62}, {token:"is",        prob:0.20}, {token:"'s",        prob:0.10}, {token:",",         prob:0.08} ],
-        "he":        [ {token:"was",         prob:0.68}, {token:"is",        prob:0.18}, {token:"became",    prob:0.09}, {token:"had",       prob:0.05} ],
-        "was":       [ {token:"a",           prob:0.70}, {token:"the",       prob:0.14}, {token:"born",      prob:0.10}, {token:"known",     prob:0.06} ],
-        "a":         [ {token:"German",      prob:0.42}, {token:"renowned",  prob:0.36}, {token:"theoretical",prob:0.13},{token:"famous",    prob:0.09} ],
-        "german":    [ {token:"theoretical", prob:0.55}, {token:"physic",    prob:0.25}, {token:"born",      prob:0.12}, {token:"Jewish",    prob:0.08} ],
-        "renowned":  [ {token:"scientist",   prob:0.55}, {token:"physic",    prob:0.25}, {token:"thinker",   prob:0.12}, {token:"figure",    prob:0.08} ],
-        "theoretical":[ {token:"physic",     prob:0.72}, {token:"scientist", prob:0.15}, {token:"framework", prob:0.08}, {token:"work",      prob:0.05} ],
-        "famous":    [ {token:"physic",      prob:0.60}, {token:"scientist", prob:0.24}, {token:"figure",    prob:0.10}, {token:"person",    prob:0.06} ],
-        "physic":    [ {token:"##ist",       prob:0.88}, {token:"##s",       prob:0.08}, {token:"##al",      prob:0.04} ],
-        "##ist":     [ {token:"who",         prob:0.58}, {token:"and",       prob:0.20}, {token:",",         prob:0.14}, {token:"known",     prob:0.08} ],
-        "scientist": [ {token:"who",         prob:0.62}, {token:"and",       prob:0.18}, {token:",",         prob:0.12}, {token:"known",     prob:0.08} ],
-        "who":       [ {token:"develop",     prob:0.43}, {token:"proposed",  prob:0.37}, {token:"created",   prob:0.12}, {token:"invented",  prob:0.08} ],
-        "develop":   [ {token:"##ed",        prob:0.88}, {token:"##ing",     prob:0.08}, {token:"##s",       prob:0.04} ],
-        "##ed":      [ {token:"the",         prob:0.72}, {token:"special",   prob:0.14}, {token:"his",       prob:0.08}, {token:"general",   prob:0.06} ],
-        "proposed":  [ {token:"the",         prob:0.68}, {token:"his",       prob:0.16}, {token:"a",         prob:0.10}, {token:"that",      prob:0.06} ],
-        "the":       [ {token:"theory",      prob:0.70}, {token:"general",   prob:0.16}, {token:"law",       prob:0.09}, {token:"concept",   prob:0.05} ],
-        "theory":    [ {token:"of",          prob:0.80}, {token:"that",      prob:0.10}, {token:",",         prob:0.06}, {token:"which",     prob:0.04} ],
-        "of":        [ {token:"relativ",     prob:0.72}, {token:"gravity",   prob:0.14}, {token:"light",     prob:0.09}, {token:"everything",prob:0.05} ],
-        "relativ":   [ {token:"##ity",       prob:0.90}, {token:"##ism",     prob:0.06}, {token:"##e",       prob:0.04} ],
-        "##ity":     [ {token:".",           prob:0.65}, {token:",",         prob:0.20}, {token:"and",       prob:0.10}, {token:"which",     prob:0.05} ],
-        ".":         [ {token:EOS_TOKEN,     prob:0.82}, {token:"He",        prob:0.08}, {token:"It",        prob:0.06}, {token:"This",      prob:0.04} ],
+        //         token produced          prob    — all alternatives must be model keys or "." / EOS
+        "?":         [ {token:"Ein",         prob:0.72}, {token:"was",        prob:0.18}, {token:"the",       prob:0.10} ],
+        "ein":       [ {token:"##stein",     prob:0.90}, {token:"the",        prob:0.07}, {token:"of",        prob:0.03} ],
+        "##stein":   [ {token:"was",         prob:0.72}, {token:"the",        prob:0.18}, {token:"of",        prob:0.10} ],
+        "was":       [ {token:"a",           prob:0.74}, {token:"the",        prob:0.16}, {token:"renowned",  prob:0.10} ],
+        "a":         [ {token:"German",      prob:0.44}, {token:"renowned",   prob:0.38}, {token:"theoretical",prob:0.18} ],
+        "german":    [ {token:"theoretical", prob:0.62}, {token:"physic",     prob:0.38} ],
+        "renowned":  [ {token:"scientist",   prob:0.65}, {token:"physic",     prob:0.35} ],
+        "theoretical":[ {token:"physic",     prob:0.78}, {token:"scientist",  prob:0.22} ],
+        "physic":    [ {token:"##ist",       prob:0.90}, {token:"the",        prob:0.07}, {token:"of",        prob:0.03} ],
+        "##ist":     [ {token:"who",         prob:0.64}, {token:"the",        prob:0.24}, {token:"of",        prob:0.12} ],
+        "scientist": [ {token:"who",         prob:0.65}, {token:"the",        prob:0.22}, {token:"of",        prob:0.13} ],
+        "who":       [ {token:"develop",     prob:0.52}, {token:"proposed",   prob:0.48} ],
+        "develop":   [ {token:"##ed",        prob:0.92}, {token:"the",        prob:0.08} ],
+        "##ed":      [ {token:"the",         prob:0.76}, {token:"of",         prob:0.16}, {token:"proposed",  prob:0.08} ],
+        "proposed":  [ {token:"the",         prob:0.74}, {token:"of",         prob:0.18}, {token:"was",       prob:0.08} ],
+        "the":       [ {token:"theory",      prob:0.72}, {token:"relativ",    prob:0.18}, {token:"of",        prob:0.10} ],
+        "theory":    [ {token:"of",          prob:0.84}, {token:"the",        prob:0.10}, {token:"was",       prob:0.06} ],
+        "of":        [ {token:"relativ",     prob:0.76}, {token:"the",        prob:0.16}, {token:"theoretical",prob:0.08} ],
+        "relativ":   [ {token:"##ity",       prob:0.93}, {token:"the",        prob:0.07} ],
+        "##ity":     [ {token:".",           prob:0.72}, {token:"the",        prob:0.18}, {token:"of",        prob:0.10} ],
+        ".":         [ {token:EOS_TOKEN,     prob:0.84}, {token:"the",        prob:0.10}, {token:"of",        prob:0.06} ],
     };
 
     // ─── Temperature toggle ────────────────────────────────────────────────────
@@ -265,11 +270,9 @@
 
     function getNextPredictedToken(lastToken) {
         const key = lastToken ? lastToken.toLowerCase() : null;
-        const raw  = simpleModel[key] || [];
-        if (raw.length === 0) {
-            console.warn(`No model entry for: "${key}"`);
-            return { selected: EOS_TOKEN, possibilities: [{token: EOS_TOKEN, prob: 1.0}], adjustedProbs: [1.0] };
-        }
+        // Fall back to the "." distribution (graceful sentence end) when a token
+        // has no model entry, so generation always terminates cleanly.
+        const raw = simpleModel[key] || simpleModel["."];
         const sorted = [...raw].sort((a, b) => b.prob - a.prob);
         const { token: selected, adjustedProbs } = sampleWithTemperature(sorted, temperature);
         return { selected, possibilities: sorted, adjustedProbs };
