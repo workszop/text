@@ -99,23 +99,6 @@
             </div>
         </div>
 
-        <!-- Expected outputs hint -->
-        <div class="mt-4 pt-4 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div class="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
-                <div class="flex items-center gap-2 mb-1.5">
-                    <span class="w-2 h-2 rounded-full bg-blue-500 shrink-0"></span>
-                    <span class="text-xs font-semibold text-blue-700 tracking-wide">T = 0 — Greedy (deterministic)</span>
-                </div>
-                <p class="text-xs text-blue-900 font-mono leading-relaxed">Einstein was a German theoretical physicist who developed the theory of relativity.</p>
-            </div>
-            <div class="bg-teal-50 border border-teal-100 rounded-xl px-4 py-3">
-                <div class="flex items-center gap-2 mb-1.5">
-                    <span class="w-2 h-2 rounded-full bg-teal-500 shrink-0"></span>
-                    <span class="text-xs font-semibold text-teal-700 tracking-wide">T = 1 — Sampling (example)</span>
-                </div>
-                <p class="text-xs text-teal-900 font-mono leading-relaxed">Einstein was a renowned scientist who proposed special relativity.</p>
-            </div>
-        </div>
     </div>
 
     <!-- Visualization Area -->
@@ -218,7 +201,7 @@
         "##stein":   [ {token:"was",         prob:0.62}, {token:"is",        prob:0.20}, {token:"'s",        prob:0.10}, {token:",",         prob:0.08} ],
         "he":        [ {token:"was",         prob:0.68}, {token:"is",        prob:0.18}, {token:"became",    prob:0.09}, {token:"had",       prob:0.05} ],
         "was":       [ {token:"a",           prob:0.70}, {token:"the",       prob:0.14}, {token:"born",      prob:0.10}, {token:"known",     prob:0.06} ],
-        "a":         [ {token:"German",      prob:0.38}, {token:"renowned",  prob:0.30}, {token:"theoretical",prob:0.20},{token:"famous",    prob:0.12} ],
+        "a":         [ {token:"German",      prob:0.42}, {token:"renowned",  prob:0.36}, {token:"theoretical",prob:0.13},{token:"famous",    prob:0.09} ],
         "german":    [ {token:"theoretical", prob:0.55}, {token:"physic",    prob:0.25}, {token:"born",      prob:0.12}, {token:"Jewish",    prob:0.08} ],
         "renowned":  [ {token:"scientist",   prob:0.55}, {token:"physic",    prob:0.25}, {token:"thinker",   prob:0.12}, {token:"figure",    prob:0.08} ],
         "theoretical":[ {token:"physic",     prob:0.72}, {token:"scientist", prob:0.15}, {token:"framework", prob:0.08}, {token:"work",      prob:0.05} ],
@@ -226,12 +209,11 @@
         "physic":    [ {token:"##ist",       prob:0.88}, {token:"##s",       prob:0.08}, {token:"##al",      prob:0.04} ],
         "##ist":     [ {token:"who",         prob:0.58}, {token:"and",       prob:0.20}, {token:",",         prob:0.14}, {token:"known",     prob:0.08} ],
         "scientist": [ {token:"who",         prob:0.62}, {token:"and",       prob:0.18}, {token:",",         prob:0.12}, {token:"known",     prob:0.08} ],
-        "who":       [ {token:"develop",     prob:0.44}, {token:"proposed",  prob:0.32}, {token:"created",   prob:0.14}, {token:"invented",  prob:0.10} ],
+        "who":       [ {token:"develop",     prob:0.43}, {token:"proposed",  prob:0.37}, {token:"created",   prob:0.12}, {token:"invented",  prob:0.08} ],
         "develop":   [ {token:"##ed",        prob:0.88}, {token:"##ing",     prob:0.08}, {token:"##s",       prob:0.04} ],
         "##ed":      [ {token:"the",         prob:0.72}, {token:"special",   prob:0.14}, {token:"his",       prob:0.08}, {token:"general",   prob:0.06} ],
-        "proposed":  [ {token:"the",         prob:0.50}, {token:"special",   prob:0.30}, {token:"his",       prob:0.12}, {token:"a",         prob:0.08} ],
-        "the":       [ {token:"theory",      prob:0.62}, {token:"special",   prob:0.18}, {token:"general",   prob:0.12}, {token:"law",       prob:0.08} ],
-        "special":   [ {token:"theory",      prob:0.52}, {token:"relativ",   prob:0.35}, {token:"case",      prob:0.08}, {token:"and",       prob:0.05} ],
+        "proposed":  [ {token:"the",         prob:0.68}, {token:"his",       prob:0.16}, {token:"a",         prob:0.10}, {token:"that",      prob:0.06} ],
+        "the":       [ {token:"theory",      prob:0.70}, {token:"general",   prob:0.16}, {token:"law",       prob:0.09}, {token:"concept",   prob:0.05} ],
         "theory":    [ {token:"of",          prob:0.80}, {token:"that",      prob:0.10}, {token:",",         prob:0.06}, {token:"which",     prob:0.04} ],
         "of":        [ {token:"relativ",     prob:0.72}, {token:"gravity",   prob:0.14}, {token:"light",     prob:0.09}, {token:"everything",prob:0.05} ],
         "relativ":   [ {token:"##ity",       prob:0.90}, {token:"##ism",     prob:0.06}, {token:"##e",       prob:0.04} ],
