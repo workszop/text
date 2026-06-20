@@ -280,7 +280,7 @@
     const tokenCount         = document.getElementById('tokenCount');
 
     // ─── Constants ────────────────────────────────────────────────────────────
-    const fixedPrompt       = "Who was Einstein?";
+    const fixedPrompt       = "Albert Einstein was";   // base-LM continuation, not Q&A
     const EOS_TOKEN         = "[EOS]";
     const TOP_K             = 4;
     const MAX_GEN_TOKENS    = 40;
@@ -289,8 +289,9 @@
     let promptTokens        = [];
     let currentContextTokens= [];
     let generatedTokens     = [];
+    let currentState        = null;   // node in MODEL (see below); encodes the context so far
     let generationComplete  = false;
-    let temperature         = 0;  // 0 = greedy, 1 = sampling
+    let temperature         = 0;  // 0 = greedy (argmax), 1 = sample from the distribution
 
     // ─── Subword map (prompt tokenisation only) ───────────────────────────────
     const effectiveSubwordMap = {
@@ -301,38 +302,58 @@
     };
 
     // ─── Model ────────────────────────────────────────────────────────────────
-    // IMPORTANT: every token that appears as a value must also be a key in this
-    // map (or be "." or EOS_TOKEN). This keeps the generation loop closed so
-    // temperature-1 sampling can never land on a dead-end token.
+    // A real LLM is a neural network that reads the ENTIRE context and outputs a
+    // probability distribution over the whole vocabulary for the next token. We
+    // can't ship a transformer in a teaching demo, so we approximate the part
+    // that matters with a tiny hand-authored model: a finite-state graph.
     //
-    // T=0 greedy path → "Einstein was a German theoretical physicist who
-    //                    developed the theory of relativity."
-    // T=1 variant     → "Einstein was a renowned scientist who proposed
-    //                    the theory of relativity."  (common alternate path)
-    const simpleModel = {
-        //         token produced          prob    — all alternatives must be model keys or "." / EOS
-        "?":         [ {token:"Ein",         prob:0.72}, {token:"was",        prob:0.18}, {token:"the",       prob:0.10} ],
-        "ein":       [ {token:"##stein",     prob:0.90}, {token:"the",        prob:0.07}, {token:"of",        prob:0.03} ],
-        "##stein":   [ {token:"was",         prob:0.72}, {token:"the",        prob:0.18}, {token:"of",        prob:0.10} ],
-        "was":       [ {token:"a",           prob:0.74}, {token:"the",        prob:0.16}, {token:"renowned",  prob:0.10} ],
-        "a":         [ {token:"German",      prob:0.44}, {token:"renowned",   prob:0.38}, {token:"theoretical",prob:0.18} ],
-        "german":    [ {token:"theoretical", prob:0.62}, {token:"physic",     prob:0.38} ],
-        "renowned":  [ {token:"scientist",   prob:0.65}, {token:"physic",     prob:0.35} ],
-        "theoretical":[ {token:"physic",     prob:0.78}, {token:"scientist",  prob:0.22} ],
-        "physic":    [ {token:"##ist",       prob:0.90}, {token:"the",        prob:0.07}, {token:"of",        prob:0.03} ],
-        "##ist":     [ {token:"who",         prob:0.64}, {token:"the",        prob:0.24}, {token:"of",        prob:0.12} ],
-        "scientist": [ {token:"who",         prob:0.65}, {token:"the",        prob:0.22}, {token:"of",        prob:0.13} ],
-        "who":       [ {token:"develop",     prob:0.52}, {token:"proposed",   prob:0.48} ],
-        "develop":   [ {token:"##ed",        prob:0.92}, {token:"the",        prob:0.08} ],
-        "##ed":      [ {token:"the",         prob:0.76}, {token:"of",         prob:0.16}, {token:"proposed",  prob:0.08} ],
-        "proposed":  [ {token:"the",         prob:0.74}, {token:"of",         prob:0.18}, {token:"was",       prob:0.08} ],
-        "the":       [ {token:"theory",      prob:0.72}, {token:"relativ",    prob:0.18}, {token:"of",        prob:0.10} ],
-        "theory":    [ {token:"of",          prob:0.84}, {token:"the",        prob:0.10}, {token:"was",       prob:0.06} ],
-        "of":        [ {token:"relativ",     prob:0.76}, {token:"the",        prob:0.16}, {token:"theoretical",prob:0.08} ],
-        "relativ":   [ {token:"##ity",       prob:0.93}, {token:"the",        prob:0.07} ],
-        "##ity":     [ {token:".",           prob:0.72}, {token:"the",        prob:0.18}, {token:"of",        prob:0.10} ],
-        ".":         [ {token:EOS_TOKEN,     prob:0.84}, {token:"the",        prob:0.10}, {token:"of",        prob:0.06} ],
+    // Each STATE represents "where we are given everything generated so far"
+    // (so it stands in for the full context, the way a real model's hidden state
+    // does). Each state lists the candidate next tokens, their probabilities,
+    // and which state each one leads to. Two properties make this honest AND
+    // robust at any temperature:
+    //   1. The graph only ever flows forward toward [EOS] — it can't loop, so
+    //      generation always terminates and never wanders.
+    //   2. EVERY candidate (not just the greedy top-1) continues into a
+    //      grammatical sentence, so sampling at T=1 yields coherent ALTERNATIVES
+    //      instead of word salad. Branches converge to shared downstream states,
+    //      which keeps the distributions rich without the graph exploding.
+    //
+    // Greedy (T=0) path → "a German theoretical physicist who developed the
+    //                      theory of relativity."
+    // Sampled (T=1) e.g. → "a renowned scientist who proposed the theory of
+    //                       relativity." / "...the idea of relativity." / etc.
+    const MODEL = {
+        //  state          token produced         prob    → next state
+        S0:           [ {token:"a",           prob:0.86, next:"S_kind"},
+                        {token:"the",         prob:0.14, next:"S_kind"} ],
+        // what kind of figure was he? (first real branch)
+        S_kind:       [ {token:"German",      prob:0.46, next:"S_germanAdj"},
+                        {token:"renowned",    prob:0.34, next:"S_renowned"},
+                        {token:"theoretical", prob:0.20, next:"S_theoretical"} ],
+        S_germanAdj:  [ {token:"theoretical", prob:1.00, next:"S_theoretical"} ],
+        S_renowned:   [ {token:"scientist",   prob:0.65, next:"S_who"},
+                        {token:"theorist",    prob:0.35, next:"S_who"} ],
+        S_theoretical:[ {token:"physic",      prob:0.88, next:"S_ist"},
+                        {token:"scientist",   prob:0.12, next:"S_who"} ],
+        S_ist:        [ {token:"##ist",       prob:1.00, next:"S_who"} ],
+        S_who:        [ {token:"who",         prob:1.00, next:"S_did"} ],
+        // what did he do? (second real branch)
+        S_did:        [ {token:"develop",     prob:0.55, next:"S_ed"},
+                        {token:"proposed",    prob:0.45, next:"S_the"} ],
+        S_ed:         [ {token:"##ed",        prob:1.00, next:"S_the"} ],
+        S_the:        [ {token:"the",         prob:0.90, next:"S_theory"},
+                        {token:"his",         prob:0.10, next:"S_theory"} ],
+        S_theory:     [ {token:"theory",      prob:0.90, next:"S_of"},
+                        {token:"idea",        prob:0.10, next:"S_of"} ],
+        S_of:         [ {token:"of",          prob:1.00, next:"S_topic"} ],
+        S_topic:      [ {token:"relativ",     prob:0.92, next:"S_ity"},
+                        {token:"gravity",     prob:0.08, next:"S_dot"} ],
+        S_ity:        [ {token:"##ity",       prob:1.00, next:"S_dot"} ],
+        S_dot:        [ {token:".",           prob:1.00, next:"S_eos"} ],
+        S_eos:        [ {token:EOS_TOKEN,     prob:1.00, next:null} ],
     };
+    const START_STATE = "S0";
 
     // ─── Temperature toggle ────────────────────────────────────────────────────
     document.getElementById('tempBtn0').addEventListener('click', () => setTemperature(0));
@@ -359,31 +380,36 @@
         return words.flatMap(w => effectiveSubwordMap[w] || [w]);
     }
 
-    // ─── Sampling ─────────────────────────────────────────────────────────────
-    function sampleWithTemperature(sorted, temp) {
+    // ─── Decoding (how a token is chosen from the distribution) ────────────────
+    // T=0 → greedy: take the highest-probability candidate (argmax).
+    // T=1 → sampling: draw a candidate at random in proportion to its
+    //       probability. (Temperature really rescales the logits; T=0 and T=1
+    //       are the two endpoints this demo contrasts.)
+    function pickCandidate(sorted, temp) {
         if (temp === 0) {
-            // Greedy: always pick top token, show raw probabilities
-            return { token: sorted[0].token, adjustedProbs: sorted.map(p => p.prob) };
+            return { index: 0, adjustedProbs: sorted.map(c => c.prob) };
         }
-        // T=1: weighted random draw using raw probabilities (log(p)/1 = identity)
-        const sum = sorted.reduce((s, p) => s + p.prob, 0);
-        const probs = sorted.map(p => p.prob / sum);  // normalise (should sum to ~1 already)
+        const sum = sorted.reduce((s, c) => s + c.prob, 0);
+        const probs = sorted.map(c => c.prob / sum);   // normalise to a clean distribution
         let r = Math.random(), cum = 0;
         for (let i = 0; i < sorted.length; i++) {
             cum += probs[i];
-            if (r <= cum) return { token: sorted[i].token, adjustedProbs: probs };
+            if (r <= cum) return { index: i, adjustedProbs: probs };
         }
-        return { token: sorted[sorted.length - 1].token, adjustedProbs: probs };
+        return { index: sorted.length - 1, adjustedProbs: probs };
     }
 
-    function getNextPredictedToken(lastToken) {
-        const key = lastToken ? lastToken.toLowerCase() : null;
-        // Fall back to the "." distribution (graceful sentence end) when a token
-        // has no model entry, so generation always terminates cleanly.
-        const raw = simpleModel[key] || simpleModel["."];
+    function getNextPrediction(state) {
+        const raw = MODEL[state] || [];
         const sorted = [...raw].sort((a, b) => b.prob - a.prob);
-        const { token: selected, adjustedProbs } = sampleWithTemperature(sorted, temperature);
-        return { selected, possibilities: sorted, adjustedProbs };
+        const { index, adjustedProbs } = pickCandidate(sorted, temperature);
+        const chosen = sorted[index];
+        return {
+            selected:      chosen.token,
+            nextState:     chosen.next,
+            possibilities: sorted,
+            adjustedProbs,
+        };
     }
 
     // ─── Render: context ──────────────────────────────────────────────────────
@@ -465,10 +491,9 @@
 
     // ─── Generation step ──────────────────────────────────────────────────────
     function nextTokenStep() {
-        if (generationComplete || currentContextTokens.length === 0) return;
+        if (generationComplete || !currentState) return;
 
-        const lastToken = currentContextTokens[currentContextTokens.length - 1];
-        const { selected: nextToken, possibilities, adjustedProbs } = getNextPredictedToken(lastToken);
+        const { selected: nextToken, nextState, possibilities, adjustedProbs } = getNextPrediction(currentState);
         const promptCount = promptTokens.length;
 
         const isTerminal = nextToken === EOS_TOKEN || generatedTokens.length >= MAX_GEN_TOKENS;
@@ -476,6 +501,7 @@
         if (isTerminal) {
             generationComplete = true;
             currentContextTokens.push(nextToken);  // EOS visible in context
+            currentState = null;
             renderContext(currentContextTokens, promptCount);
             renderProbabilities(possibilities, nextToken, adjustedProbs);
 
@@ -487,6 +513,7 @@
         } else {
             currentContextTokens.push(nextToken);
             generatedTokens.push(nextToken);
+            currentState = nextState;              // advance: the new token becomes part of the context
             renderContext(currentContextTokens, promptCount);
             renderProbabilities(possibilities, nextToken, adjustedProbs);
         }
@@ -503,6 +530,7 @@
         promptTokens          = applySubwordSplits(basicTokenize(fixedPrompt));
         currentContextTokens  = [...promptTokens];
         generatedTokens       = [];
+        currentState          = START_STATE;
         generationComplete    = false;
 
         startButton.disabled  = true;
@@ -522,6 +550,7 @@
         promptTokens          = [];
         currentContextTokens  = [];
         generatedTokens       = [];
+        currentState          = null;
         generationComplete    = false;
 
         startButton.disabled  = false;
