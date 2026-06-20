@@ -170,7 +170,7 @@
     <div class="mb-8 text-center">
         <p class="edu-overline mb-2">Interactive demo · 5 min</p>
         <h1 class="edu-display font-display text-3xl md:text-4xl font-bold text-slate-800 tracking-tight">LLM Text Generation Simulation</h1>
-        <p class="text-slate-500 mt-2.5 text-base max-w-xl mx-auto">Step through next-token prediction to see how language models generate text, one subword at a time.</p>
+        <p class="text-slate-500 mt-2.5 text-base max-w-xl mx-auto">Step through next-token prediction to see how language models generate text, one token at a time — each pick sampled from a distribution of candidates.</p>
     </div>
 
     <!-- Control Panel -->
@@ -280,9 +280,9 @@
     const tokenCount         = document.getElementById('tokenCount');
 
     // ─── Constants ────────────────────────────────────────────────────────────
-    const fixedPrompt       = "Albert Einstein was";   // base-LM continuation, not Q&A
+    const fixedPrompt       = "Albert Einstein was a";   // base-LM continuation, not Q&A
     const EOS_TOKEN         = "[EOS]";
-    const TOP_K             = 4;
+    const TOP_K             = 5;   // always surface 5 candidates so the distribution is visible
     const MAX_GEN_TOKENS    = 40;
 
     // ─── State ────────────────────────────────────────────────────────────────
@@ -303,55 +303,83 @@
 
     // ─── Model ────────────────────────────────────────────────────────────────
     // A real LLM is a neural network that reads the ENTIRE context and outputs a
-    // probability distribution over the whole vocabulary for the next token. We
+    // probability distribution over its whole vocabulary for the next token. We
     // can't ship a transformer in a teaching demo, so we approximate the part
     // that matters with a tiny hand-authored model: a finite-state graph.
     //
     // Each STATE represents "where we are given everything generated so far"
     // (so it stands in for the full context, the way a real model's hidden state
-    // does). Each state lists the candidate next tokens, their probabilities,
-    // and which state each one leads to. Two properties make this honest AND
+    // does). Each state lists FIVE candidate next tokens, their probabilities,
+    // and which state each one leads to. Three properties make this honest AND
     // robust at any temperature:
-    //   1. The graph only ever flows forward toward [EOS] — it can't loop, so
+    //   1. Every state offers 5 candidates, so the picked token is always shown
+    //      as one option drawn from a distribution (the whole point of the demo).
+    //   2. The graph only ever flows forward toward the end — it can't loop, so
     //      generation always terminates and never wanders.
-    //   2. EVERY candidate (not just the greedy top-1) continues into a
+    //   3. EVERY candidate (not just the greedy top-1) continues into a
     //      grammatical sentence, so sampling at T=1 yields coherent ALTERNATIVES
-    //      instead of word salad. Branches converge to shared downstream states,
-    //      which keeps the distributions rich without the graph exploding.
+    //      instead of word salad. Candidates converge to shared downstream
+    //      states, which keeps the distributions rich without the graph blowing
+    //      up combinatorially.
     //
-    // Greedy (T=0) path → "a German theoretical physicist who developed the
-    //                      theory of relativity."
-    // Sampled (T=1) e.g. → "a renowned scientist who proposed the theory of
-    //                       relativity." / "...the idea of relativity." / etc.
+    // Tokenisation into subwords is shown on the PROMPT ("Einstein" → "Ein" +
+    // "##stein"). Generation here is word-level: forcing subword pieces would
+    // make most steps near-deterministic (after "physic" the only sane token is
+    // "##ist"), which defeats the goal of always showing a real 5-way choice.
+    //
+    // Greedy (T=0)  → "a German physicist who developed the theory of relativity."
+    // Sampled (T=1) → e.g. "a brilliant scientist who proposed the concept of
+    //                 gravity." — a different, still-coherent path each run.
     const MODEL = {
-        //  state          token produced         prob    → next state
-        S0:           [ {token:"a",           prob:0.86, next:"S_kind"},
-                        {token:"the",         prob:0.14, next:"S_kind"} ],
-        // what kind of figure was he? (first real branch)
-        S_kind:       [ {token:"German",      prob:0.46, next:"S_germanAdj"},
-                        {token:"renowned",    prob:0.34, next:"S_renowned"},
-                        {token:"theoretical", prob:0.20, next:"S_theoretical"} ],
-        S_germanAdj:  [ {token:"theoretical", prob:1.00, next:"S_theoretical"} ],
-        S_renowned:   [ {token:"scientist",   prob:0.65, next:"S_who"},
-                        {token:"theorist",    prob:0.35, next:"S_who"} ],
-        S_theoretical:[ {token:"physic",      prob:0.88, next:"S_ist"},
-                        {token:"scientist",   prob:0.12, next:"S_who"} ],
-        S_ist:        [ {token:"##ist",       prob:1.00, next:"S_who"} ],
-        S_who:        [ {token:"who",         prob:1.00, next:"S_did"} ],
-        // what did he do? (second real branch)
-        S_did:        [ {token:"develop",     prob:0.55, next:"S_ed"},
-                        {token:"proposed",    prob:0.45, next:"S_the"} ],
-        S_ed:         [ {token:"##ed",        prob:1.00, next:"S_the"} ],
-        S_the:        [ {token:"the",         prob:0.90, next:"S_theory"},
-                        {token:"his",         prob:0.10, next:"S_theory"} ],
-        S_theory:     [ {token:"theory",      prob:0.90, next:"S_of"},
-                        {token:"idea",        prob:0.10, next:"S_of"} ],
-        S_of:         [ {token:"of",          prob:1.00, next:"S_topic"} ],
-        S_topic:      [ {token:"relativ",     prob:0.92, next:"S_ity"},
-                        {token:"gravity",     prob:0.08, next:"S_dot"} ],
-        S_ity:        [ {token:"##ity",       prob:1.00, next:"S_dot"} ],
-        S_dot:        [ {token:".",           prob:1.00, next:"S_eos"} ],
-        S_eos:        [ {token:EOS_TOKEN,     prob:1.00, next:null} ],
+        //  state      five candidate tokens (token / prob / next state) ───────────────
+        S0:        [ {token:"German",       prob:0.30, next:"S_role"},
+                     {token:"brilliant",    prob:0.24, next:"S_role"},
+                     {token:"theoretical",  prob:0.20, next:"S_role"},
+                     {token:"renowned",     prob:0.16, next:"S_role"},
+                     {token:"famous",       prob:0.10, next:"S_role"} ],
+        S_role:    [ {token:"physicist",    prob:0.44, next:"S_link"},
+                     {token:"scientist",    prob:0.24, next:"S_link"},
+                     {token:"genius",       prob:0.14, next:"S_link"},
+                     {token:"theorist",     prob:0.10, next:"S_link"},
+                     {token:"thinker",      prob:0.08, next:"S_link"} ],
+        // a relative clause continues the sentence; or the model can stop here
+        S_link:    [ {token:"who",          prob:0.70, next:"S_verb"},
+                     {token:"that",         prob:0.16, next:"S_verb"},
+                     {token:".",            prob:0.08, next:null},
+                     {token:"!",            prob:0.04, next:null},
+                     {token:"...",          prob:0.02, next:null} ],
+        S_verb:    [ {token:"developed",    prob:0.38, next:"S_det"},
+                     {token:"proposed",     prob:0.22, next:"S_det"},
+                     {token:"formulated",   prob:0.18, next:"S_det"},
+                     {token:"created",      prob:0.12, next:"S_det"},
+                     {token:"introduced",   prob:0.10, next:"S_det"} ],
+        S_det:     [ {token:"the",          prob:0.50, next:"S_noun"},
+                     {token:"his",          prob:0.24, next:"S_noun"},
+                     {token:"a",            prob:0.12, next:"S_noun"},
+                     {token:"this",         prob:0.08, next:"S_noun"},
+                     {token:"that",         prob:0.06, next:"S_noun"} ],
+        // consonant-initial nouns only, so "a ___" is always grammatical
+        S_noun:    [ {token:"theory",       prob:0.50, next:"S_prep"},
+                     {token:"concept",      prob:0.18, next:"S_prep"},
+                     {token:"principle",    prob:0.14, next:"S_prep"},
+                     {token:"framework",    prob:0.10, next:"S_prep"},
+                     {token:"model",        prob:0.08, next:"S_prep"} ],
+        S_prep:    [ {token:"of",           prob:0.80, next:"S_topic"},
+                     {token:"behind",       prob:0.08, next:"S_topic"},
+                     {token:"about",        prob:0.06, next:"S_topic"},
+                     {token:"underlying",   prob:0.04, next:"S_topic"},
+                     {token:"regarding",    prob:0.02, next:"S_topic"} ],
+        S_topic:   [ {token:"relativity",   prob:0.52, next:"S_end"},
+                     {token:"gravity",      prob:0.18, next:"S_end"},
+                     {token:"spacetime",    prob:0.12, next:"S_end"},
+                     {token:"light",        prob:0.10, next:"S_end"},
+                     {token:"energy",       prob:0.08, next:"S_end"} ],
+        // the model now decides HOW to end — every candidate finishes the text
+        S_end:     [ {token:".",            prob:0.72, next:null},
+                     {token:EOS_TOKEN,      prob:0.14, next:null},
+                     {token:"!",            prob:0.06, next:null},
+                     {token:"...",          prob:0.05, next:null},
+                     {token:";",            prob:0.03, next:null} ],
     };
     const START_STATE = "S0";
 
@@ -480,7 +508,7 @@
             const tok = filtered[i];
             if (tok.startsWith('##')) {
                 result += tok.slice(2);
-            } else if (/^[.,!?;:]$/.test(tok)) {
+            } else if (/^[.,!?;:]+$/.test(tok)) {
                 result = result.trimEnd() + tok;
             } else {
                 result += (i === 0 ? '' : ' ') + tok;
@@ -496,18 +524,24 @@
         const { selected: nextToken, nextState, possibilities, adjustedProbs } = getNextPrediction(currentState);
         const promptCount = promptTokens.length;
 
-        const isTerminal = nextToken === EOS_TOKEN || generatedTokens.length >= MAX_GEN_TOKENS;
+        // a step is terminal when the chosen token ends the text (no next state),
+        // or as a safety cap on length
+        const hitMax = generatedTokens.length >= MAX_GEN_TOKENS;
+        const isTerminal = nextState === null || hitMax;
 
         if (isTerminal) {
             generationComplete = true;
-            currentContextTokens.push(nextToken);  // EOS visible in context
+            currentContextTokens.push(nextToken);          // ending token visible in context
+            if (nextToken !== EOS_TOKEN) generatedTokens.push(nextToken);  // keep "." etc. in the output
             currentState = null;
             renderContext(currentContextTokens, promptCount);
             renderProbabilities(possibilities, nextToken, adjustedProbs);
 
             nextTokenButton.disabled = true;
             nextTokenButton.querySelector('span').textContent =
-                nextToken === EOS_TOKEN ? 'Generation complete — [EOS]' : 'Max length reached';
+                hitMax ? 'Max length reached'
+                       : nextToken === EOS_TOKEN ? 'Generation complete — [EOS]'
+                                                 : 'Generation complete';
             nextTokenButton.classList.replace('bg-teal-600', 'bg-slate-400');
             nextTokenButton.classList.replace('hover:bg-teal-700', 'hover:bg-slate-400');
         } else {
