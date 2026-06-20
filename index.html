@@ -52,20 +52,17 @@
             --font-sans:    'Hanken Grotesk', system-ui, -apple-system, sans-serif;
             --font-mono:    'DM Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
-            --paper: #FBF7F0; --paper-2: #F4EDDF; --paper-3: #ECE1CF; --surface: #FFFFFF;
-            --ink: #211E1A; --ink-2: #5B554D; --ink-3: #938A7C;
-            --line: #E7DCCB; --line-2: #D6C8B2;
+            --paper: #FBF7F0; --paper-2: #F4EDDF; --surface: #FFFFFF;
+            --ink: #211E1A; --line: #E7DCCB;
 
-            --marigold: #E8920C; --marigold-soft: #FBE7C2; --marigold-ink: #8A4F00;
+            --marigold-ink: #8A4F00;
             --teal: #0E8C7F; --teal-soft: #D2EBE6; --teal-ink: #0A5A52;
             --coral: #EF5B3F; --coral-soft: #FBDDD4; --coral-ink: #9A2E1B;
             --sky: #2E78C9; --sky-soft: #D9E7F6; --sky-ink: #1B4E88;
-            --play-grape: #7A5AC2;
 
-            --r-xs: 6px; --r-sm: 10px; --r-md: 14px; --r-lg: 20px; --r-xl: 28px; --r-pill: 999px;
+            --r-sm: 10px; --r-md: 14px; --r-pill: 999px;
             --shadow-sm: 0 1px 2px rgba(33,30,26,.06), 0 1px 1px rgba(33,30,26,.04);
             --shadow-md: 0 4px 16px rgba(33,30,26,.08), 0 1px 3px rgba(33,30,26,.05);
-            --shadow-lg: 0 16px 40px rgba(33,30,26,.12), 0 3px 8px rgba(33,30,26,.06);
         }
 
         body { font-family: var(--font-sans); background: var(--paper); color: var(--ink); }
@@ -94,9 +91,6 @@
             font-family: var(--font-mono); font-weight: 500; font-size: 12px;
             letter-spacing: 0.14em; text-transform: uppercase; color: var(--marigold-ink);
         }
-
-        /* Display headline -------------------------------------------------- */
-        .edu-display { font-family: var(--font-display); letter-spacing: -0.02em; }
 
         /* Soft warm card elevation overrides ------------------------------- */
         .edu-card { box-shadow: var(--shadow-md); }
@@ -146,7 +140,6 @@
         .section-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
 
         #nextTokenButton:disabled { opacity: 0.5; cursor: not-allowed; }
-        #nextTokenButton:disabled:hover { background-color: var(--teal); }
     </style>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -169,7 +162,7 @@
     <!-- Header -->
     <div class="mb-8 text-center">
         <p class="edu-overline mb-2">Interactive demo · 5 min</p>
-        <h1 class="edu-display font-display text-3xl md:text-4xl font-bold text-slate-800 tracking-tight">LLM Text Generation Simulation</h1>
+        <h1 class="font-display text-3xl md:text-4xl font-bold text-slate-800 tracking-tight">LLM Text Generation Simulation</h1>
         <p class="text-slate-500 mt-2.5 text-base max-w-xl mx-auto">Step through next-token prediction to see how language models generate text — one token at a time (whole words or word-pieces like <span class="font-mono text-slate-600">##ist</span>), each sampled from a distribution of candidates.</p>
     </div>
 
@@ -295,11 +288,10 @@
     let temperature         = 0;  // 0 = greedy (argmax), 1 = sample from the distribution
 
     // ─── Subword map (prompt tokenisation only) ───────────────────────────────
+    // Only the fixed prompt is tokenised here, and "Einstein" is the one word
+    // in it that splits into pieces. (Generation tokens come from MODEL below.)
     const effectiveSubwordMap = {
-        "Einstein":  ["Ein", "##stein"],
-        "physicist": ["physic", "##ist"],
-        "developed": ["develop", "##ed"],
-        "relativity":["relativ", "##ity"]
+        "Einstein": ["Ein", "##stein"],
     };
 
     // ─── Model ────────────────────────────────────────────────────────────────
@@ -438,21 +430,32 @@
     };
     const START_STATE = "S0";
 
+    // ─── Small UI helpers ──────────────────────────────────────────────────────
+    const placeholder = txt => `<span class="text-slate-400 italic text-sm">${txt}</span>`;
+
+    // Drive the Generate button's enabled state, label, and colour in one place
+    function setGenerateButton(enabled, label, done = false) {
+        nextTokenButton.disabled = !enabled;
+        nextTokenButton.querySelector('span').textContent = label;
+        nextTokenButton.classList.toggle('bg-teal-600', !done);
+        nextTokenButton.classList.toggle('hover:bg-teal-700', !done);
+        nextTokenButton.classList.toggle('bg-slate-400', done);
+        nextTokenButton.classList.toggle('hover:bg-slate-400', done);
+    }
+
     // ─── Temperature toggle ────────────────────────────────────────────────────
-    document.getElementById('tempBtn0').addEventListener('click', () => setTemperature(0));
-    document.getElementById('tempBtn1').addEventListener('click', () => setTemperature(1));
+    const tempBtn0 = document.getElementById('tempBtn0');
+    const tempBtn1 = document.getElementById('tempBtn1');
+    tempBtn0.addEventListener('click', () => setTemperature(0));
+    tempBtn1.addEventListener('click', () => setTemperature(1));
 
     function setTemperature(t) {
         temperature = t;
-        const b0 = document.getElementById('tempBtn0');
-        const b1 = document.getElementById('tempBtn1');
-        if (t === 0) {
-            b0.classList.add('active', 'text-blue-600');    b0.classList.remove('text-slate-400');
-            b1.classList.remove('active', 'text-blue-600'); b1.classList.add('text-slate-400');
-        } else {
-            b1.classList.add('active', 'text-blue-600');    b1.classList.remove('text-slate-400');
-            b0.classList.remove('active', 'text-blue-600'); b0.classList.add('text-slate-400');
-        }
+        [[tempBtn0, t === 0], [tempBtn1, t === 1]].forEach(([btn, on]) => {
+            btn.classList.toggle('active', on);
+            btn.classList.toggle('text-blue-600', on);
+            btn.classList.toggle('text-slate-400', !on);
+        });
     }
 
     // ─── Tokenisation ──────────────────────────────────────────────────────────
@@ -499,7 +502,7 @@
     function renderContext(tokens, promptCount) {
         contextDisplay.innerHTML = '';
         if (!tokens || tokens.length === 0) {
-            contextDisplay.innerHTML = '<span class="text-slate-400 italic text-sm">Click Start to begin...</span>';
+            contextDisplay.innerHTML = placeholder('Click Start to begin...');
             tokenCount.textContent = '';
             return;
         }
@@ -518,7 +521,7 @@
         if (!possibilities || possibilities.length === 0) return;
 
         possibilities.slice(0, TOP_K).forEach((item, idx) => {
-            const prob  = adjustedProbs ? adjustedProbs[idx] : item.prob;
+            const prob  = adjustedProbs[idx];
             const pct   = (prob * 100).toFixed(1);
             const isSelected = item.token === selectedToken;
 
@@ -592,13 +595,10 @@
             renderContext(currentContextTokens, promptCount);
             renderProbabilities(possibilities, nextToken, adjustedProbs);
 
-            nextTokenButton.disabled = true;
-            nextTokenButton.querySelector('span').textContent =
+            setGenerateButton(false,
                 hitMax ? 'Max length reached'
                        : nextToken === EOS_TOKEN ? 'Generation complete — [EOS]'
-                                                 : 'Generation complete';
-            nextTokenButton.classList.replace('bg-teal-600', 'bg-slate-400');
-            nextTokenButton.classList.replace('hover:bg-teal-700', 'hover:bg-slate-400');
+                                                 : 'Generation complete', true);
         } else {
             currentContextTokens.push(nextToken);
             generatedTokens.push(nextToken);
@@ -610,7 +610,7 @@
         const text = reconstructText(generatedTokens);
         outputDisplay.textContent = text || '';
         if (!text && generationComplete) {
-            outputDisplay.innerHTML = '<span class="text-slate-400 italic text-sm">No output generated.</span>';
+            outputDisplay.innerHTML = placeholder('No output generated.');
         }
     }
 
@@ -624,15 +624,12 @@
 
         startButton.disabled  = true;
         resetButton.disabled  = false;
-        nextTokenButton.disabled = false;
-        nextTokenButton.querySelector('span').textContent = 'Generate Next Token';
-        nextTokenButton.classList.replace('bg-slate-400', 'bg-teal-600');
-        nextTokenButton.classList.replace('hover:bg-slate-400', 'hover:bg-teal-700');
+        setGenerateButton(true, 'Generate Next Token');
 
         visualizationArea.classList.remove('hidden');
         renderContext(currentContextTokens, promptTokens.length);
-        nextTokenDisplay.innerHTML = '<span class="text-slate-400 italic text-sm">Click Generate Next Token...</span>';
-        outputDisplay.innerHTML    = '<span class="text-slate-400 italic text-sm">Generated text will appear here...</span>';
+        nextTokenDisplay.innerHTML = placeholder('Click Generate Next Token...');
+        outputDisplay.innerHTML    = placeholder('Generated text will appear here...');
     }
 
     function resetApplication() {
@@ -644,15 +641,12 @@
 
         startButton.disabled  = false;
         resetButton.disabled  = true;
-        nextTokenButton.disabled = true;
-        nextTokenButton.querySelector('span').textContent = 'Generate Next Token';
-        nextTokenButton.classList.replace('bg-slate-400', 'bg-teal-600');
-        nextTokenButton.classList.replace('hover:bg-slate-400', 'hover:bg-teal-700');
+        setGenerateButton(false, 'Generate Next Token');
 
         visualizationArea.classList.add('hidden');
-        contextDisplay.innerHTML    = '<span class="text-slate-400 italic text-sm">Click Start to begin...</span>';
-        nextTokenDisplay.innerHTML  = '<span class="text-slate-400 italic text-sm">...</span>';
-        outputDisplay.innerHTML     = '<span class="text-slate-400 italic text-sm">Generated text will appear here...</span>';
+        contextDisplay.innerHTML    = placeholder('Click Start to begin...');
+        nextTokenDisplay.innerHTML  = placeholder('...');
+        outputDisplay.innerHTML     = placeholder('Generated text will appear here...');
         tokenCount.textContent = '';
 
         fixedPromptDisplay.textContent = fixedPrompt;
