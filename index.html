@@ -317,12 +317,12 @@
     //     one option drawn from a real distribution (the point of the demo).
     //   • Tokens are SUBWORDS, like a real tokeniser: words such as "physicist",
     //     "developed" and "relativity" are emitted in pieces (physic + ##ist,
-    //     develop + ##ed, relativ + ##ity). The same suffix token (##ist, ##ed)
-    //     is reused across different words — exactly how subword vocabularies
-    //     work. After a stem the suffix is essentially the only sensible token,
-    //     so those steps are near-deterministic (one candidate). That peaked
-    //     case is truthful: real distributions are sometimes flat, sometimes
-    //     almost certain.
+    //     develop + ##ed, relativ + ##ity). These suffix steps still present a
+    //     real distribution rather than a lone token — e.g. physic → ##ist
+    //     (physicist) vs ##ian (physician); develop → ##ed vs ##s; relativ →
+    //     ##ity vs ##ism — usually peaked, as in real models. Some words are
+    //     single tokens (scientist, theorist): a realistic mix of pieces and
+    //     whole words in one vocabulary.
     //   • The graph only flows forward toward the end (no loops → always
     //     terminates), and EVERY candidate continues into a grammatical
     //     sentence, so T=1 sampling yields coherent ALTERNATIVES, not word salad.
@@ -342,13 +342,16 @@
                      {token:"theoretical",  prob:0.20, next:"S_role"},
                      {token:"renowned",     prob:0.16, next:"S_role"},
                      {token:"famous",       prob:0.10, next:"S_role"} ],
-        // role nouns — three are split before the shared "##ist" suffix
-        S_role:    [ {token:"physic",       prob:0.40, next:"S_ist"},
-                     {token:"scient",       prob:0.22, next:"S_ist"},
+        // role nouns: "physic" is split (then a 2-way subword choice); the rest
+        // are single-token words — a realistic mix of word-pieces and whole words
+        S_role:    [ {token:"physic",       prob:0.40, next:"S_physic"},
+                     {token:"scientist",    prob:0.22, next:"S_link"},
                      {token:"genius",       prob:0.16, next:"S_link"},
-                     {token:"theor",        prob:0.12, next:"S_ist"},
+                     {token:"theorist",     prob:0.12, next:"S_link"},
                      {token:"thinker",      prob:0.10, next:"S_link"} ],
-        S_ist:     [ {token:"##ist",        prob:1.00, next:"S_link"} ],  // physic/scient/theor → -ist
+        // subword step WITH a real choice: physicist vs physician
+        S_physic:  [ {token:"##ist",        prob:0.85, next:"S_link"},    // physicist
+                     {token:"##ian",        prob:0.15, next:"S_link"} ],  // physician
         // a relative clause continues the sentence; or the model can end the
         // sentence here with punctuation, then still select [EOS] to stop
         S_link:    [ {token:"who",          prob:0.70, next:"S_verb"},
@@ -362,7 +365,9 @@
                      {token:"publish",      prob:0.18, next:"S_ed"},
                      {token:"perfect",      prob:0.12, next:"S_ed"},
                      {token:"defend",       prob:0.10, next:"S_ed"} ],
-        S_ed:      [ {token:"##ed",         prob:1.00, next:"S_det"} ],   // develop/present/... → -ed
+        // subword step WITH a choice: past tense (-ed) vs present (-s)
+        S_ed:      [ {token:"##ed",         prob:0.82, next:"S_det"},     // developed
+                     {token:"##s",          prob:0.18, next:"S_det"} ],   // develops
         S_det:     [ {token:"the",          prob:0.50, next:"S_noun"},
                      {token:"his",          prob:0.24, next:"S_noun"},
                      {token:"a",            prob:0.12, next:"S_noun"},
@@ -385,7 +390,9 @@
                      {token:"spacetime",    prob:0.12, next:"S_end"},
                      {token:"light",        prob:0.10, next:"S_end"},
                      {token:"energy",       prob:0.08, next:"S_end"} ],
-        S_ity:     [ {token:"##ity",        prob:1.00, next:"S_end"} ],   // relativ → relativity
+        // subword step WITH a choice: relativity vs relativism
+        S_ity:     [ {token:"##ity",        prob:0.85, next:"S_end"},     // relativity
+                     {token:"##ism",        prob:0.15, next:"S_end"} ],   // relativism
         // sentence-final punctuation — a normal token, chosen before EOS
         S_end:     [ {token:".",            prob:0.84, next:"S_eos"},
                      {token:"!",            prob:0.10, next:"S_eos"},
