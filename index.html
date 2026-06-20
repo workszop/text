@@ -284,7 +284,7 @@
     const EOS_TOKEN         = "[EOS]";
     const TOP_K             = 5;   // surface up to 5 candidates so the distribution is visible
                                    // (suffix steps like "##ist" are legitimately near-certain)
-    const MAX_GEN_TOKENS    = 40;
+    const MAX_GEN_TOKENS    = 64;   // safety cap; with [EOS] ~0.86 per sentence this is ~never hit
 
     // ─── State ────────────────────────────────────────────────────────────────
     let promptTokens        = [];
@@ -313,24 +313,25 @@
     // does). Each state lists its candidate next tokens, their probabilities,
     // and which state each one leads to. Properties that keep this honest AND
     // robust at any temperature:
-    //   • Word-choice states offer 5 candidates, so the picked token is shown as
+    //   • EVERY state offers 5 candidates, so the picked token is always shown as
     //     one option drawn from a real distribution (the point of the demo).
     //   • Tokens are SUBWORDS, like a real tokeniser: words such as "physicist",
     //     "developed" and "relativity" are emitted in pieces (physic + ##ist,
-    //     develop + ##ed, relativ + ##ity). These suffix steps still present a
-    //     real distribution rather than a lone token — e.g. physic → ##ist
-    //     (physicist) vs ##ian (physician); develop → ##ed vs ##s; relativ →
-    //     ##ity vs ##ism — usually peaked, as in real models. Some words are
-    //     single tokens (scientist, theorist): a realistic mix of pieces and
-    //     whole words in one vocabulary.
-    //   • The graph only flows forward toward the end (no loops → always
-    //     terminates), and EVERY candidate continues into a grammatical
-    //     sentence, so T=1 sampling yields coherent ALTERNATIVES, not word salad.
+    //     develop + ##ed, relativ + ##ity). Each suffix step shows 5 candidate
+    //     pieces — peaked on the dominant one (##ist, ##ed, ##ity) with a
+    //     realistic low-probability tail, exactly like a real subword vocabulary.
+    //     Some words are single tokens (scientist, theorist): a realistic mix of
+    //     pieces and whole words.
     //   • [EOS] is a real vocabulary token. Generation stops only when the model
     //     explicitly SELECTS [EOS] — the period "." is a separate, earlier
-    //     token. After a complete sentence [EOS] usually wins, but the model may
-    //     instead start another short sentence, which again ends by selecting
-    //     [EOS]. That is exactly how a real model decides it is "done".
+    //     token. After each sentence the model RETURNS to the [EOS] decision
+    //     (emit [EOS] and stop, or start another sentence). [EOS] is highly
+    //     likely once a sentence is complete, so generation terminates quickly;
+    //     a hard token cap bounds the rare long run. That is exactly how a real
+    //     model decides it is "done".
+    //   • Candidates are chosen so the likely paths stay grammatical, so T=1
+    //     yields coherent ALTERNATIVES, not word salad (only the low-probability
+    //     subword tail is occasionally non-standard, as in real sampling).
     //
     // Greedy (T=0)  → "a German physicist who developed the theory of relativity."
     // Sampled (T=1) → e.g. "a brilliant scientist who published a concept of
@@ -349,9 +350,13 @@
                      {token:"genius",       prob:0.16, next:"S_link"},
                      {token:"theorist",     prob:0.12, next:"S_link"},
                      {token:"thinker",      prob:0.10, next:"S_link"} ],
-        // subword step WITH a real choice: physicist vs physician
-        S_physic:  [ {token:"##ist",        prob:0.85, next:"S_link"},    // physicist
-                     {token:"##ian",        prob:0.15, next:"S_link"} ],  // physician
+        // subword step: 5 continuations of "physic" — sharply peaked on ##ist
+        // with a thin low-probability tail (just like a real tokeniser's vocab)
+        S_physic:  [ {token:"##ist",        prob:0.93, next:"S_link"},    // physicist
+                     {token:"##ian",        prob:0.03, next:"S_link"},    // physician
+                     {token:"##ists",       prob:0.02, next:"S_link"},    // physicists
+                     {token:"##s",          prob:0.01, next:"S_link"},    // physics
+                     {token:"##al",         prob:0.01, next:"S_link"} ],  // physical
         // a relative clause continues the sentence; or the model can end the
         // sentence here with punctuation, then still select [EOS] to stop
         S_link:    [ {token:"who",          prob:0.70, next:"S_verb"},
@@ -365,9 +370,12 @@
                      {token:"publish",      prob:0.18, next:"S_ed"},
                      {token:"perfect",      prob:0.12, next:"S_ed"},
                      {token:"defend",       prob:0.10, next:"S_ed"} ],
-        // subword step WITH a choice: past tense (-ed) vs present (-s)
-        S_ed:      [ {token:"##ed",         prob:0.82, next:"S_det"},     // developed
-                     {token:"##s",          prob:0.18, next:"S_det"} ],   // develops
+        // subword step: 5 continuations of a verb stem — sharply peaked on ##ed
+        S_ed:      [ {token:"##ed",         prob:0.93, next:"S_det"},     // developed
+                     {token:"##s",          prob:0.04, next:"S_det"},     // develops
+                     {token:"##ing",        prob:0.01, next:"S_det"},     // developing
+                     {token:"##ment",       prob:0.01, next:"S_det"},     // development
+                     {token:"##ers",        prob:0.01, next:"S_det"} ],   // developers
         S_det:     [ {token:"the",          prob:0.50, next:"S_noun"},
                      {token:"his",          prob:0.24, next:"S_noun"},
                      {token:"a",            prob:0.12, next:"S_noun"},
@@ -390,22 +398,28 @@
                      {token:"spacetime",    prob:0.12, next:"S_end"},
                      {token:"light",        prob:0.10, next:"S_end"},
                      {token:"energy",       prob:0.08, next:"S_end"} ],
-        // subword step WITH a choice: relativity vs relativism
-        S_ity:     [ {token:"##ity",        prob:0.85, next:"S_end"},     // relativity
-                     {token:"##ism",        prob:0.15, next:"S_end"} ],   // relativism
+        // subword step: 5 continuations of "relativ" — sharply peaked on ##ity
+        S_ity:     [ {token:"##ity",        prob:0.93, next:"S_end"},     // relativity
+                     {token:"##ism",        prob:0.03, next:"S_end"},     // relativism
+                     {token:"##ist",        prob:0.02, next:"S_end"},     // relativist
+                     {token:"##istic",      prob:0.01, next:"S_end"},     // relativistic
+                     {token:"##ities",      prob:0.01, next:"S_end"} ],   // relativities
         // sentence-final punctuation — a normal token, chosen before EOS
-        S_end:     [ {token:".",            prob:0.84, next:"S_eos"},
-                     {token:"!",            prob:0.10, next:"S_eos"},
-                     {token:"...",          prob:0.06, next:"S_eos"} ],
+        S_end:     [ {token:".",            prob:0.90, next:"S_eos"},
+                     {token:"!",            prob:0.05, next:"S_eos"},
+                     {token:"...",          prob:0.03, next:"S_eos"},
+                     {token:"?",            prob:0.01, next:"S_eos"},
+                     {token:";",            prob:0.01, next:"S_eos"} ],
         // THE STOP STEP: the model explicitly selects [EOS] to end generation.
-        // It usually wins, but could instead start a new sentence (just like a
-        // real model deciding whether the text is finished).
+        // It usually wins, but may instead start a new sentence. Every finished
+        // sentence comes back here, so this 5-way [EOS] decision recurs (bounded
+        // by [EOS]'s high probability and the MAX_GEN_TOKENS cap).
         S_eos:     [ {token:EOS_TOKEN,      prob:0.86, next:null},
                      {token:"He",           prob:0.05, next:"S2_verb"},
                      {token:"It",           prob:0.04, next:"S2_verb"},
                      {token:"This",         prob:0.03, next:"S2_verb"},
                      {token:"That",         prob:0.02, next:"S2_verb"} ],
-        // optional short second sentence (reached only if EOS is NOT selected)
+        // a further sentence (reached only if [EOS] was NOT selected above)
         S2_verb:   [ {token:"changed",      prob:0.40, next:"S2_obj"},
                      {token:"transformed",  prob:0.22, next:"S2_obj"},
                      {token:"shaped",       prob:0.16, next:"S2_obj"},
@@ -416,10 +430,11 @@
                      {token:"everything",   prob:0.16, next:"S2_end"},
                      {token:"cosmology",    prob:0.10, next:"S2_end"},
                      {token:"history",      prob:0.10, next:"S2_end"} ],
-        S2_end:    [ {token:".",            prob:0.84, next:"S2_eos"},
-                     {token:"!",            prob:0.10, next:"S2_eos"},
-                     {token:"...",          prob:0.06, next:"S2_eos"} ],
-        S2_eos:    [ {token:EOS_TOKEN,      prob:1.00, next:null} ],      // explicit stop
+        S2_end:    [ {token:".",            prob:0.90, next:"S_eos"},     // back to the [EOS] decision
+                     {token:"!",            prob:0.05, next:"S_eos"},
+                     {token:"...",          prob:0.03, next:"S_eos"},
+                     {token:"?",            prob:0.01, next:"S_eos"},
+                     {token:";",            prob:0.01, next:"S_eos"} ],
     };
     const START_STATE = "S0";
 
