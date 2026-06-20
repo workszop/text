@@ -326,6 +326,11 @@
     //   • The graph only flows forward toward the end (no loops → always
     //     terminates), and EVERY candidate continues into a grammatical
     //     sentence, so T=1 sampling yields coherent ALTERNATIVES, not word salad.
+    //   • [EOS] is a real vocabulary token. Generation stops only when the model
+    //     explicitly SELECTS [EOS] — the period "." is a separate, earlier
+    //     token. After a complete sentence [EOS] usually wins, but the model may
+    //     instead start another short sentence, which again ends by selecting
+    //     [EOS]. That is exactly how a real model decides it is "done".
     //
     // Greedy (T=0)  → "a German physicist who developed the theory of relativity."
     // Sampled (T=1) → e.g. "a brilliant scientist who published a concept of
@@ -344,12 +349,13 @@
                      {token:"theor",        prob:0.12, next:"S_ist"},
                      {token:"thinker",      prob:0.10, next:"S_link"} ],
         S_ist:     [ {token:"##ist",        prob:1.00, next:"S_link"} ],  // physic/scient/theor → -ist
-        // a relative clause continues the sentence; or the model can stop here
+        // a relative clause continues the sentence; or the model can end the
+        // sentence here with punctuation, then still select [EOS] to stop
         S_link:    [ {token:"who",          prob:0.70, next:"S_verb"},
                      {token:"that",         prob:0.16, next:"S_verb"},
-                     {token:".",            prob:0.08, next:null},
-                     {token:"!",            prob:0.04, next:null},
-                     {token:"...",          prob:0.02, next:null} ],
+                     {token:".",            prob:0.08, next:"S_eos"},
+                     {token:"!",            prob:0.04, next:"S_eos"},
+                     {token:"...",          prob:0.02, next:"S_eos"} ],
         // verb stems — all share the "##ed" suffix
         S_verb:    [ {token:"develop",      prob:0.38, next:"S_ed"},
                      {token:"present",      prob:0.22, next:"S_ed"},
@@ -380,12 +386,33 @@
                      {token:"light",        prob:0.10, next:"S_end"},
                      {token:"energy",       prob:0.08, next:"S_end"} ],
         S_ity:     [ {token:"##ity",        prob:1.00, next:"S_end"} ],   // relativ → relativity
-        // the model now decides HOW to end — every candidate finishes the text
-        S_end:     [ {token:".",            prob:0.72, next:null},
-                     {token:EOS_TOKEN,      prob:0.14, next:null},
-                     {token:"!",            prob:0.06, next:null},
-                     {token:"...",          prob:0.05, next:null},
-                     {token:";",            prob:0.03, next:null} ],
+        // sentence-final punctuation — a normal token, chosen before EOS
+        S_end:     [ {token:".",            prob:0.84, next:"S_eos"},
+                     {token:"!",            prob:0.10, next:"S_eos"},
+                     {token:"...",          prob:0.06, next:"S_eos"} ],
+        // THE STOP STEP: the model explicitly selects [EOS] to end generation.
+        // It usually wins, but could instead start a new sentence (just like a
+        // real model deciding whether the text is finished).
+        S_eos:     [ {token:EOS_TOKEN,      prob:0.86, next:null},
+                     {token:"He",           prob:0.05, next:"S2_verb"},
+                     {token:"It",           prob:0.04, next:"S2_verb"},
+                     {token:"This",         prob:0.03, next:"S2_verb"},
+                     {token:"That",         prob:0.02, next:"S2_verb"} ],
+        // optional short second sentence (reached only if EOS is NOT selected)
+        S2_verb:   [ {token:"changed",      prob:0.40, next:"S2_obj"},
+                     {token:"transformed",  prob:0.22, next:"S2_obj"},
+                     {token:"shaped",       prob:0.16, next:"S2_obj"},
+                     {token:"reshaped",     prob:0.12, next:"S2_obj"},
+                     {token:"redefined",    prob:0.10, next:"S2_obj"} ],
+        S2_obj:    [ {token:"physics",      prob:0.40, next:"S2_end"},
+                     {token:"science",      prob:0.24, next:"S2_end"},
+                     {token:"everything",   prob:0.16, next:"S2_end"},
+                     {token:"cosmology",    prob:0.10, next:"S2_end"},
+                     {token:"history",      prob:0.10, next:"S2_end"} ],
+        S2_end:    [ {token:".",            prob:0.84, next:"S2_eos"},
+                     {token:"!",            prob:0.10, next:"S2_eos"},
+                     {token:"...",          prob:0.06, next:"S2_eos"} ],
+        S2_eos:    [ {token:EOS_TOKEN,      prob:1.00, next:null} ],      // explicit stop
     };
     const START_STATE = "S0";
 
