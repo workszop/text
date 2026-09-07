@@ -483,7 +483,7 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
         pl: {
             docTitle:          'Symulacja generowania tekstu przez LLM · edulab',
             title:             'Symulacja generowania tekstu przez LLM',
-            intro:             'Przejdź krok po kroku przez przewidywanie kolejnego tokenu i zobacz, jak model językowy składa tekst: token po tokenie (całe słowa lub ich kawałki, np. ##ist), za każdym razem wybrany z rozkładu kandydatów.',
+            intro:             'Przejdź krok po kroku przez przewidywanie kolejnego tokenu i zobacz, jak model językowy składa tekst: token po tokenie (całe słowa lub ich kawałki, np. ##czką), za każdym razem wybrany z rozkładu kandydatów.',
             prompt:            'Prompt',
             temperature:       'Temperatura',
             start:             'Start',
@@ -571,8 +571,11 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
     }
 
     function setLanguage(l) {
-        lang = T[l] ? l : 'en';
+        const next = T[l] ? l : 'en';
+        const changed = next !== lang;
+        lang = next;
         try { localStorage.setItem(LANG_KEY, lang); } catch (e) {}
+        if (changed) resetApplication();   // each language has its own prompt + model
         applyLanguage();
     }
 
@@ -585,7 +588,8 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
     }
 
     // ─── Constants ────────────────────────────────────────────────────────────
-    const fixedPrompt       = "Albert Einstein was a";   // base-LM continuation, not Q&A
+    // The prompt and model are per language: see EXAMPLES below (base-LM
+    // continuation, not Q&A, in both cases).
     const EOS_TOKEN         = "[EOS]";
     const TOP_K             = 5;   // surface up to 5 candidates so the distribution is visible
                                    // (suffix steps like "##ist" are legitimately near-certain)
@@ -599,12 +603,11 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
     let generationComplete  = false;
     let temperature         = 0;  // 0 = greedy (argmax), 1 = sample from the distribution
 
-    // ─── Subword map (prompt tokenisation only) ───────────────────────────────
-    // Only the fixed prompt is tokenised here, and "Einstein" is the one word
-    // in it that splits into pieces. (Generation tokens come from MODEL below.)
-    const effectiveSubwordMap = {
-        "Einstein": ["Ein", "##stein"],
-    };
+    // ─── Subword maps (prompt tokenisation only) ──────────────────────────────
+    // Only the fixed prompt is tokenised here; one word in each prompt splits
+    // into pieces. (Generation tokens come from the models below.)
+    const SUBWORD_EN = { "Einstein":   ["Ein", "##stein"] };
+    const SUBWORD_PL = { "Skłodowska": ["Skłodow", "##ska"] };
 
     // ─── Model ────────────────────────────────────────────────────────────────
     // A real LLM is a neural network that reads the ENTIRE context and outputs a
@@ -640,7 +643,7 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
     // Greedy (T=0)  → "a German physicist who developed the theory of relativity."
     // Sampled (T=1) → e.g. "a brilliant scientist who published a concept of
     //                 gravity." — a different, still-coherent path each run.
-    const MODEL = {
+    const MODEL_EN = {
         //  state      candidate tokens (token / prob / next state) ───────────────────
         S0:        [ {token:"German",       prob:0.30, next:"S_role"},
                      {token:"brilliant",    prob:0.24, next:"S_role"},
@@ -740,7 +743,147 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
                      {token:"?",            prob:0.01, next:"S_eos"},
                      {token:";",            prob:0.01, next:"S_eos"} ],
     };
-    const START_STATE = "S0";
+
+    // ─── Polish model ─────────────────────────────────────────────────────────
+    // Same construction, Polish text. The prompt "Maria Skłodowska-Curie była"
+    // (note: "Skłodowska" splits into Skłodow + ##ska, and "-" is its own
+    // token). Inflection makes the subword steps very natural here: fizy +
+    // ##czką (fizyczką), odkry + ##ła (odkryła), pierwiast + ##ek, promienio +
+    // ##twórczość. Every candidate keeps the sentence grammatical (feminine
+    // instrumental after "była", feminine past-tense verbs), so T=1 gives
+    // coherent alternatives.
+    //
+    // Greedy (T=0)  → "polską fizyczką, która odkryła polon i rad."
+    // Sampled (T=1) → e.g. "wybitną uczoną, gdyż zbadała nowy pierwiastek oraz
+    //                 promieniotwórczość." — a different path each run.
+    const MODEL_PL = {
+        //  state      candidate tokens (token / prob / next state) ───────────────────
+        P0:        [ {token:"polską",       prob:0.30, next:"P_role"},
+                     {token:"wybitną",      prob:0.24, next:"P_role"},
+                     {token:"pierwszą",     prob:0.20, next:"P_role"},
+                     {token:"słynną",       prob:0.16, next:"P_role"},
+                     {token:"genialną",     prob:0.10, next:"P_role"} ],
+        // role nouns: "fizy" is split (fizyczką); the rest are whole tokens
+        P_role:    [ {token:"fizy",         prob:0.40, next:"P_fizy"},
+                     {token:"uczoną",       prob:0.22, next:"P_link"},
+                     {token:"badaczką",     prob:0.16, next:"P_link"},
+                     {token:"chemiczką",    prob:0.12, next:"P_link"},
+                     {token:"noblistką",    prob:0.10, next:"P_link"} ],
+        // subword step: continuations of "fizy" — peaked on ##czką
+        P_fizy:    [ {token:"##czką",       prob:0.93, next:"P_link"},    // fizyczką
+                     {token:"##kiem",       prob:0.03, next:"P_link"},    // fizykiem
+                     {token:"##ką",         prob:0.02, next:"P_link"},    // fizyką
+                     {token:"##czki",       prob:0.01, next:"P_link"},    // fizyczki
+                     {token:"##cy",         prob:0.01, next:"P_link"} ],  // fizycy
+        // a comma opens a relative clause; or the sentence ends here
+        P_link:    [ {token:",",            prob:0.72, next:"P_rel"},
+                     {token:".",            prob:0.16, next:"P_eos"},
+                     {token:"!",            prob:0.06, next:"P_eos"},
+                     {token:"...",          prob:0.04, next:"P_eos"},
+                     {token:";",            prob:0.02, next:"P_eos"} ],
+        // relative / causal connectors — each one is followed by a verb
+        P_rel:     [ {token:"która",        prob:0.80, next:"P_verb"},
+                     {token:"gdyż",         prob:0.08, next:"P_verb"},
+                     {token:"jaka",         prob:0.06, next:"P_verb"},
+                     {token:"bo",           prob:0.04, next:"P_verb"},
+                     {token:"co",           prob:0.02, next:"P_verb"} ],
+        // verb stems — all take the feminine past-tense ending ##ła
+        P_verb:    [ {token:"odkry",        prob:0.38, next:"P_la"},
+                     {token:"zbada",        prob:0.22, next:"P_la"},
+                     {token:"opisa",        prob:0.18, next:"P_la"},
+                     {token:"wyizolowa",    prob:0.12, next:"P_la"},
+                     {token:"otrzyma",      prob:0.10, next:"P_la"} ],
+        // subword step: past-tense endings — peaked on ##ła
+        P_la:      [ {token:"##ła",         prob:0.93, next:"P_obj"},     // odkryła
+                     {token:"##ł",          prob:0.04, next:"P_obj"},     // odkrył
+                     {token:"##li",         prob:0.01, next:"P_obj"},     // odkryli
+                     {token:"##ły",         prob:0.01, next:"P_obj"},     // odkryły
+                     {token:"##wszy",       prob:0.01, next:"P_obj"} ],   // odkrywszy
+        // object: an element by name, or an adjective + "pierwiastek"
+        P_obj:     [ {token:"polon",        prob:0.50, next:"P_conjP"},
+                     {token:"rad",          prob:0.18, next:"P_conjR"},
+                     {token:"nowy",         prob:0.14, next:"P_pierw"},
+                     {token:"nieznany",     prob:0.10, next:"P_pierw"},
+                     {token:"kolejny",      prob:0.08, next:"P_pierw"} ],
+        P_pierw:   [ {token:"pierwiast",    prob:0.62, next:"P_ek"},
+                     {token:"metal",        prob:0.20, next:"P_conjP"},
+                     {token:"izotop",       prob:0.12, next:"P_conjP"},
+                     {token:"składnik",     prob:0.04, next:"P_conjP"},
+                     {token:"minerał",      prob:0.02, next:"P_conjP"} ],
+        // subword step: continuations of "pierwiast" — peaked on ##ek
+        P_ek:      [ {token:"##ek",         prob:0.93, next:"P_conjP"},   // pierwiastek
+                     {token:"##ki",         prob:0.03, next:"P_conjP"},   // pierwiastki
+                     {token:"##ka",         prob:0.02, next:"P_conjP"},   // pierwiastka
+                     {token:"##kowy",       prob:0.01, next:"P_conjP"},   // pierwiastkowy
+                     {token:"##kach",       prob:0.01, next:"P_conjP"} ], // pierwiastkach
+        // conjunction or sentence end; two variants so "rad i rad" cannot occur
+        P_conjP:   [ {token:"i",            prob:0.60, next:"P_obj2R"},
+                     {token:"oraz",         prob:0.20, next:"P_obj2R"},
+                     {token:".",            prob:0.12, next:"P_eos"},
+                     {token:"...",          prob:0.05, next:"P_eos"},
+                     {token:"!",            prob:0.03, next:"P_eos"} ],
+        P_conjR:   [ {token:"i",            prob:0.60, next:"P_obj2P"},
+                     {token:"oraz",         prob:0.20, next:"P_obj2P"},
+                     {token:".",            prob:0.12, next:"P_eos"},
+                     {token:"...",          prob:0.05, next:"P_eos"},
+                     {token:"!",            prob:0.03, next:"P_eos"} ],
+        // second object — "promienio" is split (promienio + ##twórczość)
+        P_obj2R:   [ {token:"rad",          prob:0.60, next:"P_end"},
+                     {token:"promienio",    prob:0.20, next:"P_twor"},
+                     {token:"uran",         prob:0.12, next:"P_end"},
+                     {token:"tor",          prob:0.05, next:"P_end"},
+                     {token:"aktyn",        prob:0.03, next:"P_end"} ],
+        P_obj2P:   [ {token:"polon",        prob:0.60, next:"P_end"},
+                     {token:"promienio",    prob:0.20, next:"P_twor"},
+                     {token:"uran",         prob:0.12, next:"P_end"},
+                     {token:"tor",          prob:0.05, next:"P_end"},
+                     {token:"aktyn",        prob:0.03, next:"P_end"} ],
+        P_twor:    [ {token:"##twórczość",  prob:0.93, next:"P_end"},     // promieniotwórczość
+                     {token:"##twórcze",    prob:0.03, next:"P_end"},     // promieniotwórcze
+                     {token:"##wanie",      prob:0.02, next:"P_end"},     // promieniowanie
+                     {token:"##twórczy",    prob:0.01, next:"P_end"},     // promieniotwórczy
+                     {token:"##twórczości", prob:0.01, next:"P_end"} ],   // promieniotwórczości
+        // sentence-final punctuation — a normal token, chosen before EOS
+        P_end:     [ {token:".",            prob:0.90, next:"P_eos"},
+                     {token:"!",            prob:0.05, next:"P_eos"},
+                     {token:"...",          prob:0.03, next:"P_eos"},
+                     {token:"?",            prob:0.01, next:"P_eos"},
+                     {token:";",            prob:0.01, next:"P_eos"} ],
+        // THE STOP STEP: [EOS] usually wins; otherwise a second sentence starts
+        P_eos:     [ {token:EOS_TOKEN,      prob:0.86, next:null},
+                     {token:"Otrzymała",    prob:0.06, next:"P2_obj"},
+                     {token:"Zdobyła",      prob:0.04, next:"P2_obj"},
+                     {token:"Dostała",      prob:0.02, next:"P2_obj"},
+                     {token:"Odebrała",     prob:0.02, next:"P2_obj"} ],
+        // "Otrzymała Nagrodę Nobla." / "Zdobyła dwie Nagrody Nobla."
+        P2_obj:    [ {token:"Nagrodę",      prob:0.62, next:"P2_nob"},
+                     {token:"dwie",         prob:0.22, next:"P2_nagrody"},
+                     {token:"medal",        prob:0.08, next:"P2_end"},
+                     {token:"sławę",        prob:0.05, next:"P2_end"},
+                     {token:"uznanie",      prob:0.03, next:"P2_end"} ],
+        P2_nagrody:[ {token:"Nagrody",      prob:0.88, next:"P2_nob"},
+                     {token:"nagrody",      prob:0.06, next:"P2_nob"},
+                     {token:"medale",       prob:0.03, next:"P2_end"},
+                     {token:"kolejne",      prob:0.02, next:"P2_nagrody"},
+                     {token:"wielkie",      prob:0.01, next:"P2_nagrody"} ],
+        P2_nob:    [ {token:"Nobla",        prob:0.90, next:"P2_end"},
+                     {token:"Nobel",        prob:0.04, next:"P2_end"},
+                     {token:"noblowską",    prob:0.03, next:"P2_end"},
+                     {token:"Nobl",         prob:0.02, next:"P2_end"},
+                     {token:"Nobelu",       prob:0.01, next:"P2_end"} ],
+        P2_end:    [ {token:".",            prob:0.90, next:"P_eos"},     // back to the [EOS] decision
+                     {token:"!",            prob:0.05, next:"P_eos"},
+                     {token:"...",          prob:0.03, next:"P_eos"},
+                     {token:"?",            prob:0.01, next:"P_eos"},
+                     {token:";",            prob:0.01, next:"P_eos"} ],
+    };
+
+    // ─── Examples: one per UI language ────────────────────────────────────────
+    const EXAMPLES = {
+        en: { prompt: "Albert Einstein was a",        subwords: SUBWORD_EN, model: MODEL_EN, start: "S0" },
+        pl: { prompt: "Maria Skłodowska-Curie była",  subwords: SUBWORD_PL, model: MODEL_PL, start: "P0" },
+    };
+    const example = () => EXAMPLES[lang] || EXAMPLES.en;
 
     // ─── Small UI helpers ──────────────────────────────────────────────────────
     // key is a T entry, so a language switch can re-render it via data-i18n
@@ -770,10 +913,10 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
 
     // ─── Tokenisation ──────────────────────────────────────────────────────────
     function basicTokenize(text) {
-        return (text.match(/(\w+|[^\w\s])/g) || []);
+        return (text.match(/(\p{L}+|\d+|[^\p{L}\d\s])/gu) || []);
     }
     function applySubwordSplits(words) {
-        return words.flatMap(w => effectiveSubwordMap[w] || [w]);
+        return words.flatMap(w => example().subwords[w] || [w]);
     }
 
     // ─── Decoding (how a token is chosen from the distribution) ────────────────
@@ -796,7 +939,7 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
     }
 
     function getNextPrediction(state) {
-        const raw = MODEL[state] || [];
+        const raw = example().model[state] || [];
         const sorted = [...raw].sort((a, b) => b.prob - a.prob);
         const { index, adjustedProbs } = pickCandidate(sorted, temperature);
         const chosen = sorted[index];
@@ -926,10 +1069,10 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
 
     // ─── Init / reset ─────────────────────────────────────────────────────────
     function initializeGeneration() {
-        promptTokens          = applySubwordSplits(basicTokenize(fixedPrompt));
+        promptTokens          = applySubwordSplits(basicTokenize(example().prompt));
         currentContextTokens  = [...promptTokens];
         generatedTokens       = [];
-        currentState          = START_STATE;
+        currentState          = example().start;
         generationComplete    = false;
 
         startButton.disabled  = true;
@@ -959,7 +1102,7 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
         outputDisplay.innerHTML     = placeholder('outputPlaceholder');
         tokenCount.textContent = '';
 
-        fixedPromptDisplay.textContent = fixedPrompt;
+        fixedPromptDisplay.textContent = example().prompt;
     }
 
     // ─── Event listeners ──────────────────────────────────────────────────────
@@ -970,8 +1113,8 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
         btn.addEventListener('click', () => setLanguage(btn.dataset.lang)));
 
     window.onload = () => {
-        resetApplication();
         lang = initialLanguage();
+        resetApplication();
         applyLanguage();
     };
 </script>
