@@ -17,18 +17,22 @@
                         mono:    ['"Roboto Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
                     },
                     colors: {
-                        slate:  { 50:'#F5F3F0', 100:'#F5F3F0', 200:'#E0DBD3', 300:'#C9C2B7',
+                        slate:  { 50:'#FFFFFF', 100:'#F5F3F0', 200:'#E0DBD3', 300:'#C9C2B7',
                                   400:'#625B53', 500:'#44403C', 600:'#44403C', 700:'#1C1917', 800:'#1C1917', 900:'#1C1917' },
+                        stone:  { 50:'#FFFFFF', 100:'#F5F3F0', 200:'#EAE6E0', 300:'#C9C2B7', 400:'#857C69' },  // bands / wells / lines / control border
                         yellow: { 50:'#FFD500', 500:'#FFD500', 600:'#FFD500', 700:'#F0C800', 800:'#D9B400' },
-                        blue:   { 50:'#1E8FC2', 500:'#1E8FC2', 600:'#1E8FC2', 700:'#177AA8', 800:'#146A92' },
-                        green:  { 50:'#00A651', 500:'#00A651', 600:'#00A651', 700:'#009444', 800:'#00753A' },
-                        red:    { 50:'#E5322D', 500:'#E5322D', 600:'#E5322D', 700:'#C92823', 800:'#B3261E' },
+                        blue:   { 50:'#1E8FC2', 500:'#177AA8', 600:'#177AA8', 700:'#146A92', 800:'#105A7C' },
+                        green:  { 50:'#00A651', 500:'#078342', 600:'#078342', 700:'#06733A', 800:'#055F30' },
+                        red:    { 50:'#E5322D', 500:'#C92823', 600:'#C92823', 700:'#B3261E', 800:'#9C2019' },
                         violet: { 500:'#7A5AC2', 600:'#6A4BAF' },
                     },
                 },
             },
         };
     </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap">
     <style>
 /* ============================================================
    edulab — Colors & Type foundation
@@ -36,7 +40,6 @@
    Foundations" for substitution notes.
    ============================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap');
 
 :root {
   /* ---- Brand fonts ---- */
@@ -217,12 +220,11 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
         /* Branded sticky header --------------------------------------------- */
         .edu-header {
             position: sticky; top: 0; z-index: 50; width: 100%;
-            background: rgba(255, 255, 255, 0.85);
-            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-            border-bottom: 1px solid var(--line);
+            background: var(--paper);                 /* solid: the bar is a fixed edge, not a haze */
+            border-bottom: 1px solid var(--line-2);
         }
-        .edu-header-inner {
-            max-width: 1100px; margin: 0 auto;
+        .edu-header-inner {                           /* 1100px content + 30px gutters: same left edge as <main> */
+            max-width: 1160px; margin: 0 auto;
             padding: 8px 30px; display: flex; align-items: center; gap: 12px;
         }
         .edu-logo { width: 64px; height: 64px; display: block; margin-right: -6px; }
@@ -238,16 +240,27 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
         .edu-seg button.active { background: var(--yellow); color: var(--yellow-ink); }
 
         /* Page header ------------------------------------------------------- */
-        .page-header { text-align: center; margin: 0 0 34px; }
+        .page-header { text-align: left; margin: 0 0 30px; padding: 10px 0 30px; border-bottom: 1px solid var(--line-2); }
         .app-title {
             font-family: var(--font-display); font-weight: 800;
-            font-size: clamp(2rem, 4.5vw, 2.85rem); letter-spacing: -0.025em;
-            line-height: 1.05; color: var(--ink); margin: 0 0 12px;
+            font-size: clamp(2.3rem, 5vw, 3.3rem); letter-spacing: -0.025em;
+            line-height: 1.05; color: var(--ink); margin: 0 0 14px;
         }
-        .edu-lead { font-family: var(--font-sans); font-size: 1.0625rem; line-height: 1.6; color: var(--ink-2); margin: 0; }
+        .edu-lead { font-family: var(--font-sans); font-size: 1.15rem; line-height: 1.6; color: var(--ink-2); margin: 0; }
 
         /* Cards ------------------------------------------------------------- */
-        .edu-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow-md); }
+        /* Card anatomy: --line-2 contour, stone head strip, white body */
+        .edu-card { background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r-lg); box-shadow: var(--shadow-sm); overflow: hidden; }
+        .card-head { display: flex; align-items: center; gap: 8px; padding: 12px 20px;
+            background: var(--paper-2); border-bottom: 1px solid var(--line); }
+        .card-body { padding: 20px; }
+
+        /* Field labels: mono, uppercase, tracked */
+        .field-label { font-family: var(--font-mono); font-size: 12px; font-weight: 500; text-transform: uppercase;
+            letter-spacing: .1em; color: var(--ink); flex-shrink: 0; }
+
+        /* Focus: white gap + ink band, visible on yellow too */
+        :focus-visible { outline: 3px solid transparent; outline-offset: 2px; box-shadow: var(--focus-ring); }
 
         /* Buttons ----------------------------------------------------------- */
         .edu-btn {
@@ -259,8 +272,8 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
         .edu-btn-primary { background: var(--yellow); color: var(--on-primary); box-shadow: var(--shadow-primary); }
         .edu-btn-primary:hover { background: var(--yellow-600); }
         .edu-btn-primary:active { transform: scale(.97); }
-        .edu-btn-ghost { background: var(--paper-2); color: var(--ink-2); }
-        .edu-btn-ghost:hover { background: var(--paper-3); color: var(--ink); }
+        .edu-btn-ghost { background: transparent; color: var(--ink); border: 1px solid var(--line-strong); }
+        .edu-btn-ghost:hover { background: var(--paper-2); color: var(--ink); }
         .edu-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
         .edu-btn.done { background: var(--paper-3); color: var(--ink-2); box-shadow: none; }
 
@@ -283,10 +296,10 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
         .prob-row.selected { background: var(--blue-soft); color: var(--blue-ink); }
         .prob-row.selected .pct { color: var(--blue-ink); }
         .prob-row.selected .candidate-token { border-color: transparent; }
-        .prob-row.selected .eos-token { background: var(--surface); color: var(--red); }
+        .prob-row.selected .eos-token { background: var(--surface); color: var(--red-600); }
 
-        .prob-bar-track { height: 6px; border-radius: var(--r-pill); background: rgba(33,30,26,0.12); overflow: hidden; }
-        .prob-row.selected .prob-bar-track { background: rgba(255,255,255,0.28); }
+        .prob-bar-track { height: 6px; border-radius: var(--r-pill); background: var(--track); overflow: hidden; }
+        .prob-row.selected .prob-bar-track { background: color-mix(in srgb, var(--paper) 28%, transparent); }
         .prob-bar-fill  { height: 100%; border-radius: var(--r-pill); transition: width 0.35s ease; }
 
         /* Temperature toggle — same idiom as the language switch */
@@ -308,15 +321,15 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
         .app-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 24px; align-items: start; }
         .app-guide { position: sticky; top: 96px; display: flex; flex-direction: column; gap: 12px; }
         .guide-card {
-            background: var(--surface); border: 1px solid var(--line);
-            border-radius: var(--r-md); padding: 14px 16px; box-shadow: var(--shadow-sm);
+            background: var(--surface); border: 1px solid var(--line-2);
+            border-radius: var(--r-md); box-shadow: var(--shadow-sm); overflow: hidden;
         }
-        .guide-card h4 {
-            display: flex; align-items: center; gap: 8px;
-            font-family: var(--font-display); font-weight: 700; font-size: 14px;
-            color: var(--ink); margin-bottom: 6px;
+        .guide-card h4 {                          /* stone head strip */
+            display: flex; align-items: center; gap: 8px; margin: 0; padding: 10px 16px;
+            background: var(--paper-2); border-bottom: 1px solid var(--line);
+            font-family: var(--font-display); font-weight: 700; font-size: 14px; color: var(--ink);
         }
-        .guide-card p { font-family: var(--font-sans); font-size: 13px; line-height: 1.55; color: var(--ink-2); }
+        .guide-card p { margin: 0; padding: 12px 16px 14px; font-family: var(--font-sans); font-size: 13px; line-height: 1.55; color: var(--ink-2); }
         @media (max-width: 768px) {
             .app-layout { grid-template-columns: 1fr; }
             .app-guide { position: static; }
@@ -356,13 +369,13 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
         <div class="flex flex-wrap items-center gap-3">
             <!-- Prompt -->
             <div class="flex items-center gap-2 mr-auto">
-                <span class="font-mono text-[11px] font-medium uppercase tracking-wider text-slate-400 shrink-0" data-i18n="prompt">Prompt</span>
-                <span id="fixedPromptDisplay" class="font-mono text-sm bg-slate-50 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-xl"></span>
+                <span class="field-label" data-i18n="prompt">Prompt</span>
+                <span id="fixedPromptDisplay" class="font-mono text-sm bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-xl"></span>
             </div>
 
             <!-- Temperature toggle -->
             <div class="flex items-center gap-2.5">
-                <span class="font-mono text-[11px] font-medium uppercase tracking-wider text-slate-400 shrink-0" data-i18n="temperature">Temperature</span>
+                <span class="field-label" data-i18n="temperature">Temperature</span>
                 <div class="edu-seg !ml-0">
                     <button id="tempBtn0" class="temp-btn active">0</button>
                     <button id="tempBtn1" class="temp-btn">1</button>
@@ -388,14 +401,16 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
     <div id="visualizationArea" class="space-y-3 hidden">
 
         <!-- Context panel -->
-        <div class="edu-card p-5 fade-in">
-            <div class="flex items-center gap-2 mb-3">
+        <div class="edu-card fade-in">
+            <div class="card-head">
                 <span class="section-dot bg-blue-500"></span>
                 <h3 class="card-title" data-i18n="contextTitle">Context: subword tokens</h3>
                 <span id="tokenCount" class="ml-auto font-mono text-xs text-slate-400 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-full"></span>
             </div>
+            <div class="card-body">
             <div id="contextDisplay" class="flex flex-wrap min-h-[2.5rem] items-start">
                 <span class="text-slate-400 italic text-sm" data-i18n="clickStart">Click Start to begin...</span>
+            </div>
             </div>
         </div>
 
@@ -411,14 +426,16 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
         </div>
 
         <!-- Predicted token panel -->
-        <div class="edu-card p-5">
-            <div class="flex items-center gap-2 mb-3">
+        <div class="edu-card">
+            <div class="card-head">
                 <span class="section-dot bg-green-500"></span>
                 <h3 class="card-title" data-i18n="predictedTitle">Predicted next token</h3>
                 <span class="ml-auto font-mono text-[11px] text-slate-400 uppercase tracking-wider" data-i18n="topCandidates">top candidates</span>
             </div>
+            <div class="card-body">
             <div id="nextTokenDisplay" class="space-y-2 min-h-[5rem]">
                 <span class="text-slate-400 italic text-sm">...</span>
+            </div>
             </div>
         </div>
 
@@ -429,13 +446,15 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
         </button>
 
         <!-- Output panel -->
-        <div class="edu-card p-5">
-            <div class="flex items-center gap-2 mb-3">
+        <div class="edu-card">
+            <div class="card-head">
                 <span class="section-dot bg-violet-500"></span>
                 <h3 class="card-title" data-i18n="outputTitle">Generated text</h3>
             </div>
+            <div class="card-body">
             <div id="outputDisplay" class="text-base font-medium text-slate-700 leading-relaxed min-h-[1.75rem]">
                 <span class="text-slate-400 italic text-sm" data-i18n="outputPlaceholder">Generated text will appear here...</span>
+            </div>
             </div>
         </div>
 
