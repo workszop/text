@@ -246,7 +246,7 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
         .edu-seg button.active { background: var(--yellow); color: var(--yellow-ink); }
 
         /* Page header ------------------------------------------------------- */
-        .page-header { text-align: left; margin: 0 0 30px; padding: 10px 0 30px; border-bottom: 1px solid var(--line-2); }
+        .page-header { text-align: left; margin: 0 0 24px; padding: 0; }
         .app-title {
             font-family: var(--font-display); font-weight: 800;
             font-size: clamp(2.3rem, 5vw, 3.3rem); letter-spacing: -0.025em;
@@ -360,9 +360,10 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
         .edu-card h3.card-title { font-family: var(--font-display); font-weight: 600; font-size: 18px; letter-spacing: -0.01em; color: var(--ink); }
 
         /* App + guide layout ---------------------------------------------- */
-        .app-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 24px; align-items: start; }
-        .app-guide { position: sticky; top: 96px; display: flex; flex-direction: column; gap: 12px; }
+        .app-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 24px; align-items: stretch; }   /* guide column matches the app column's height */
+        .app-guide { display: flex; flex-direction: column; gap: 12px; }
         .guide-card {
+            flex: 1 1 auto;                       /* cards share the column's height */
             background: var(--surface); border: 1px solid var(--line-2);
             border-radius: var(--r-md); box-shadow: var(--shadow-sm); overflow: hidden;
         }
@@ -371,10 +372,9 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
             background: var(--paper-2); border-bottom: 1px solid var(--line);
             font-family: var(--font-display); font-weight: 700; font-size: 14px; color: var(--ink);
         }
-        .guide-card p { margin: 0; padding: 12px 16px 14px; font-family: var(--font-sans); font-size: 13px; line-height: 1.55; color: var(--ink-2); }
+        .guide-card p { margin: 0; padding: 14px 16px 16px; font-family: var(--font-sans); font-size: 14px; line-height: 1.55; color: var(--ink-2); }
         @media (max-width: 768px) {
             .app-layout { grid-template-columns: 1fr; }
-            .app-guide { position: static; }
             .card-head { flex-wrap: wrap; }
         }
     </style>
@@ -393,7 +393,7 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
     </div>
 </header>
 
-<main class="px-5 md:px-[30px] pt-[34px] pb-[70px] flex flex-col items-center">
+<main class="px-5 md:px-[30px] pt-[22px] pb-[70px] flex flex-col items-center">
 <div class="w-full max-w-[1100px]">
 
     <!-- Title -->
