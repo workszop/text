@@ -30,6 +30,7 @@
             },
         };
     </script>
+    <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap">
@@ -94,6 +95,11 @@
   --red-600:  #C92823;
   --red-soft: #C92823;
   --red-ink:  #FFFFFF;
+
+  /* Grape — category tone only (first in the tone order) */
+  --grape:      #7A5AC2;
+  --grape-soft: #7A5AC2;  /* white text 5.2:1 */
+  --grape-ink:  #FFFFFF;
 
   /* Legacy role aliases — older edulab apps use these names */
   --marigold: var(--yellow); --marigold-600: var(--yellow-600); --marigold-soft: var(--yellow-soft); --marigold-ink: var(--yellow-ink);
@@ -254,6 +260,32 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
         .card-head { display: flex; align-items: center; gap: 8px; padding: 12px 20px;
             background: var(--paper-2); border-bottom: 1px solid var(--line); }
         .card-body { padding: 20px; }
+        .card-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; padding: 10px 20px;
+            border-top: 1px dashed var(--line-2); }
+        .head-meta { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+        .meta-label { font-family: var(--font-mono); font-size: 11px; font-weight: 500; text-transform: uppercase;
+            letter-spacing: .1em; color: var(--ink-2); white-space: nowrap; }
+
+        /* Tones & icon badges -------------------------------------------- */
+        .tone-grape { background: var(--grape-soft);  color: var(--grape-ink); }
+        .tone-blue  { background: var(--blue-soft);   color: var(--blue-ink); }
+        .tone-green { background: var(--green-soft);  color: var(--green-ink); }
+        .tone-yellow{ background: var(--yellow-soft); color: var(--yellow-ink); }
+        .tone-ink   { background: var(--ink);         color: var(--paper); }
+        .tone-stone { background: var(--paper-3);     color: var(--ink); }
+        .badge { flex: none; width: 34px; height: 34px; border-radius: var(--r-sm); display: inline-grid; place-items: center; }
+        .badge.tone-ink { color: var(--yellow); }
+        .badge .ic { width: 18px; height: 18px; }
+        .badge-sm { width: 26px; height: 26px; border-radius: var(--r-xs); }
+        .badge-sm .ic { width: 15px; height: 15px; }
+
+        /* Phase chip: idle / running / done (also published as data-phase) */
+        .phase-chip { font-family: var(--font-mono); font-size: 11px; font-weight: 500; text-transform: uppercase;
+            letter-spacing: .1em; padding: 4px 10px; border-radius: var(--r-pill); white-space: nowrap; }
+
+        /* Context legend */
+        .legend-item { display: inline-flex; align-items: center; gap: 7px; }
+        .swatch { width: 18px; height: 10px; border-radius: var(--r-pill); }
 
         /* Field labels: mono, uppercase, tracked */
         .field-label { font-family: var(--font-mono); font-size: 12px; font-weight: 500; text-transform: uppercase;
@@ -288,6 +320,10 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
         .prompt-token    { background: var(--blue-soft);  color: var(--blue-ink); }
         .context-token   { background: var(--green-soft); color: var(--green-ink); }
         .eos-token       { background: var(--red-soft);   color: var(--red-ink); font-style: italic; }
+        .eos-token.swatch { font-style: normal; }
+        /* Idle preview: the prompt's words before tokenisation, and the slot the next token lands in */
+        .ghost-token     { background: var(--surface); color: var(--ink-3); border: 1px dashed var(--line-strong); }
+        .next-slot       { background: var(--paper-2); color: var(--ink-3); border: 1px dashed var(--line-strong); min-width: 34px; justify-content: center; }
         .candidate-token { background: var(--surface); color: var(--ink); border: 1px solid var(--line-2); }
 
         /* Probability rows: unselected = sand well, selected = solid blue block */
@@ -302,6 +338,14 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
         .prob-row.selected .prob-bar-track { background: color-mix(in srgb, var(--paper) 28%, transparent); }
         .prob-bar-fill  { height: 100%; border-radius: var(--r-pill); transition: width 0.35s ease; }
 
+        /* Skeleton rows: the shape of a distribution before there is one */
+        .prob-row.skeleton .pct { color: var(--ink-3); }
+        .prob-row.skeleton .prob-bar-track { background: var(--surface); }
+        .prob-row.skeleton .prob-bar-fill { background: var(--line-2); }
+        .ghost-chip { display: inline-block; height: 24px; margin: 2px 3px; border-radius: var(--r-pill);
+            background: var(--surface); border: 1px dashed var(--line-2); }
+        .ghost-line { height: 10px; margin-top: 10px; border-radius: var(--r-pill); background: var(--paper-3); }
+
         /* Temperature toggle — same idiom as the language switch */
         .temp-btn { border: none; background: transparent; padding: 6px 18px; border-radius: var(--r-pill);
             font-family: var(--font-sans); font-weight: 600; font-size: 14px; color: var(--ink-2); cursor: pointer;
@@ -315,7 +359,6 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
         }
 
         .edu-card h3.card-title { font-family: var(--font-display); font-weight: 600; font-size: 18px; letter-spacing: -0.01em; color: var(--ink); }
-        .section-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
 
         /* App + guide layout ---------------------------------------------- */
         .app-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 24px; align-items: start; }
@@ -325,7 +368,7 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
             border-radius: var(--r-md); box-shadow: var(--shadow-sm); overflow: hidden;
         }
         .guide-card h4 {                          /* stone head strip */
-            display: flex; align-items: center; gap: 8px; margin: 0; padding: 10px 16px;
+            display: flex; align-items: center; gap: 10px; margin: 0; padding: 8px 14px;
             background: var(--paper-2); border-bottom: 1px solid var(--line);
             font-family: var(--font-display); font-weight: 700; font-size: 14px; color: var(--ink);
         }
@@ -333,6 +376,7 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
         @media (max-width: 768px) {
             .app-layout { grid-template-columns: 1fr; }
             .app-guide { position: static; }
+            .card-head { flex-wrap: wrap; }
         }
     </style>
 </head>
@@ -359,11 +403,20 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
         <p class="edu-lead" data-i18n="intro"></p>
     </header>
 
-    <div class="app-layout">
+    <div id="app" class="app-layout" data-phase="idle" data-step="0">
     <div class="app-column">
 
     <!-- Control Panel -->
-    <div class="edu-card p-5 mb-4">
+    <div class="edu-card mb-4">
+        <div class="card-head">
+            <span class="badge tone-ink"><i data-lucide="sliders-horizontal" class="ic"></i></span>
+            <h3 class="card-title" data-i18n="controlsTitle">Prompt and temperature</h3>
+            <span class="head-meta">
+                <span class="meta-label"><span data-i18n="step">Step</span> <span id="stepCount">0</span></span>
+                <span id="phaseChip" class="phase-chip tone-stone" role="status" aria-live="polite"></span>
+            </span>
+        </div>
+        <div class="card-body">
 
         <!-- Top row: prompt + temperature + buttons -->
         <div class="flex flex-wrap items-center gap-3">
@@ -395,22 +448,27 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
             </div>
         </div>
 
+        </div>
     </div>
 
-    <!-- Visualization Area -->
-    <div id="visualizationArea" class="space-y-3 hidden">
+    <!-- Visualization Area: always visible; idle shows the structure before a run -->
+    <div id="visualizationArea" class="space-y-3">
 
         <!-- Context panel -->
         <div class="edu-card fade-in">
             <div class="card-head">
-                <span class="section-dot bg-blue-500"></span>
+                <span class="badge tone-blue"><i data-lucide="layers" class="ic"></i></span>
                 <h3 class="card-title" data-i18n="contextTitle">Context: subword tokens</h3>
-                <span id="tokenCount" class="ml-auto font-mono text-xs text-slate-400 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-full"></span>
+                <span id="tokenCount" class="ml-auto whitespace-nowrap font-mono text-xs text-slate-400 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-full"></span>
             </div>
             <div class="card-body">
-            <div id="contextDisplay" class="flex flex-wrap min-h-[2.5rem] items-start">
-                <span class="text-slate-400 italic text-sm" data-i18n="clickStart">Click Start to begin...</span>
+            <div id="contextDisplay" class="flex flex-wrap min-h-[2.5rem] items-start"></div>
             </div>
+            <div class="card-foot" aria-label="Legend">
+                <span class="legend-item"><span class="swatch prompt-token"></span><span class="meta-label" data-i18n="legendPrompt">prompt</span></span>
+                <span class="legend-item"><span class="swatch context-token"></span><span class="meta-label" data-i18n="legendGenerated">generated</span></span>
+                <span class="legend-item"><span class="swatch eos-token"></span><span class="meta-label" data-i18n="legendEos">end of text</span></span>
+                <span class="legend-item"><span class="swatch next-slot"></span><span class="meta-label" data-i18n="legendNext">next token</span></span>
             </div>
         </div>
 
@@ -428,14 +486,12 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
         <!-- Predicted token panel -->
         <div class="edu-card">
             <div class="card-head">
-                <span class="section-dot bg-green-500"></span>
+                <span class="badge tone-green"><i data-lucide="chart-bar" class="ic"></i></span>
                 <h3 class="card-title" data-i18n="predictedTitle">Predicted next token</h3>
                 <span class="ml-auto font-mono text-[11px] text-slate-400 uppercase tracking-wider" data-i18n="topCandidates">top candidates</span>
             </div>
             <div class="card-body">
-            <div id="nextTokenDisplay" class="space-y-2 min-h-[5rem]">
-                <span class="text-slate-400 italic text-sm">...</span>
-            </div>
+            <div id="nextTokenDisplay" class="space-y-2 min-h-[5rem]"></div>
             </div>
         </div>
 
@@ -448,13 +504,11 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
         <!-- Output panel -->
         <div class="edu-card">
             <div class="card-head">
-                <span class="section-dot bg-violet-500"></span>
+                <span class="badge tone-grape"><i data-lucide="file-text" class="ic"></i></span>
                 <h3 class="card-title" data-i18n="outputTitle">Generated text</h3>
             </div>
             <div class="card-body">
-            <div id="outputDisplay" class="text-base font-medium text-slate-700 leading-relaxed min-h-[1.75rem]">
-                <span class="text-slate-400 italic text-sm" data-i18n="outputPlaceholder">Generated text will appear here...</span>
-            </div>
+            <div id="outputDisplay" class="text-base font-medium text-slate-700 leading-relaxed min-h-[1.75rem]"></div>
             </div>
         </div>
 
@@ -464,19 +518,19 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
     <!-- Guide: what each box does -->
     <aside class="app-guide" aria-label="Guide">
         <div class="guide-card">
-            <h4><span class="section-dot bg-blue-500"></span><span data-i18n="guidePromptTitle"></span></h4>
+            <h4><span class="badge badge-sm tone-ink"><i data-lucide="sliders-horizontal" class="ic"></i></span><span data-i18n="guidePromptTitle"></span></h4>
             <p data-i18n="guidePromptBody"></p>
         </div>
         <div class="guide-card">
-            <h4><span class="section-dot bg-blue-500"></span><span data-i18n="guideContextTitle"></span></h4>
+            <h4><span class="badge badge-sm tone-blue"><i data-lucide="layers" class="ic"></i></span><span data-i18n="guideContextTitle"></span></h4>
             <p data-i18n="guideContextBody"></p>
         </div>
         <div class="guide-card">
-            <h4><span class="section-dot bg-green-500"></span><span data-i18n="guidePredictTitle"></span></h4>
+            <h4><span class="badge badge-sm tone-green"><i data-lucide="chart-bar" class="ic"></i></span><span data-i18n="guidePredictTitle"></span></h4>
             <p data-i18n="guidePredictBody"></p>
         </div>
         <div class="guide-card">
-            <h4><span class="section-dot bg-violet-500"></span><span data-i18n="guideOutputTitle"></span></h4>
+            <h4><span class="badge badge-sm tone-grape"><i data-lucide="file-text" class="ic"></i></span><span data-i18n="guideOutputTitle"></span></h4>
             <p data-i18n="guideOutputBody"></p>
         </div>
     </aside>
@@ -490,11 +544,13 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
     const startButton        = document.getElementById('startButton');
     const resetButton        = document.getElementById('resetButton');
     const nextTokenButton    = document.getElementById('nextTokenButton');
-    const visualizationArea  = document.getElementById('visualizationArea');
     const contextDisplay     = document.getElementById('contextDisplay');
     const nextTokenDisplay   = document.getElementById('nextTokenDisplay');
     const outputDisplay      = document.getElementById('outputDisplay');
     const tokenCount         = document.getElementById('tokenCount');
+    const appRoot            = document.getElementById('app');
+    const phaseChip          = document.getElementById('phaseChip');
+    const stepCount          = document.getElementById('stepCount');
 
     // ─── i18n ─────────────────────────────────────────────────────────────────
     const LANG_KEY = 'llm-sim-lang';
@@ -521,6 +577,15 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
             complete:          'Generowanie zakończone',
             completeEos:       'Generowanie zakończone: [EOS]',
             maxLength:         'Osiągnięto maksymalną długość',
+            controlsTitle:     'Prompt i temperatura',
+            step:              'Krok',
+            phaseIdle:         'Gotowe do startu',
+            phaseRunning:      'Generowanie',
+            phaseDone:         'Zakończono',
+            legendPrompt:      'prompt',
+            legendGenerated:   'wygenerowane',
+            legendEos:         'koniec tekstu',
+            legendNext:        'kolejny token',
             guidePromptTitle:  'Prompt i temperatura',
             guidePromptBody:   'Prompt jest stały: model dopisuje ciąg dalszy, a nie odpowiada na pytanie. Przy temperaturze 0 zawsze bierze najbardziej prawdopodobny token. Przy temperaturze 1 losuje w proporcji do prawdopodobieństw, więc każde uruchomienie może dać inny tekst.',
             guideContextTitle: 'Kontekst',
@@ -552,6 +617,15 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
             complete:          'Generation complete',
             completeEos:       'Generation complete: [EOS]',
             maxLength:         'Max length reached',
+            controlsTitle:     'Prompt and temperature',
+            step:              'Step',
+            phaseIdle:         'Ready to start',
+            phaseRunning:      'Generating',
+            phaseDone:         'Finished',
+            legendPrompt:      'prompt',
+            legendGenerated:   'generated',
+            legendEos:         'end of text',
+            legendNext:        'next token',
             guidePromptTitle:  'Prompt and temperature',
             guidePromptBody:   'The prompt is fixed: the model continues it rather than answering a question. At temperature 0 it always takes the most probable token. At temperature 1 it samples in proportion to the probabilities, so each run can produce a different text.',
             guideContextTitle: 'Context',
@@ -586,7 +660,7 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
             btn.classList.toggle('active', on);
             btn.setAttribute('aria-pressed', on);
         });
-        if (currentContextTokens.length) tokenCount.textContent = tokenCountLabel(currentContextTokens.length);
+        tokenCount.textContent = tokenCountLabel(currentContextTokens.length);
     }
 
     function setLanguage(l) {
@@ -613,6 +687,12 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
     const TOP_K             = 5;   // surface up to 5 candidates so the distribution is visible
                                    // (suffix steps like "##ist" are legitimately near-certain)
     const MAX_GEN_TOKENS    = 64;   // safety cap; with [EOS] ~0.86 per sentence this is ~never hit
+    const SKELETON_BARS     = [58, 21, 11, 6, 4];   // idle rows hint at a falling distribution
+    const PHASES = {                                // phase → [label key, chip tone]
+        idle:    ['phaseIdle',    'tone-stone'],
+        running: ['phaseRunning', 'tone-yellow'],
+        done:    ['phaseDone',    'tone-green'],
+    };
 
     // ─── State ────────────────────────────────────────────────────────────────
     let promptTokens        = [];
@@ -917,6 +997,19 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
         nextTokenButton.classList.toggle('done', done);
     }
 
+    // Phase + step drive the status chip and the DOM contract (data-phase / data-step on #app)
+    function setPhase(phase) {
+        const [key, tone] = PHASES[phase];
+        appRoot.dataset.phase = phase;
+        phaseChip.className   = 'phase-chip ' + tone;
+        phaseChip.dataset.i18n = key;
+        phaseChip.textContent = t(key);
+    }
+    function setStep(n) {
+        appRoot.dataset.step  = n;
+        stepCount.textContent = n;
+    }
+
     // ─── Temperature toggle ────────────────────────────────────────────────────
     const tempBtn0 = document.getElementById('tempBtn0');
     const tempBtn1 = document.getElementById('tempBtn1');
@@ -971,20 +1064,52 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
     }
 
     // ─── Render: context ──────────────────────────────────────────────────────
+    function tokenChip(text, cls) {
+        const span = document.createElement('span');
+        span.textContent = text;
+        span.className = 'token ' + cls;
+        return span;
+    }
+    // dashed slot where the next token will land (hidden from screen readers)
+    function appendNextSlot() {
+        const slot = tokenChip('?', 'next-slot');
+        slot.setAttribute('aria-hidden', 'true');
+        contextDisplay.appendChild(slot);
+    }
+
     function renderContext(tokens, promptCount) {
         contextDisplay.innerHTML = '';
-        if (!tokens || tokens.length === 0) {
-            contextDisplay.innerHTML = placeholder('clickStart');
-            tokenCount.textContent = '';
-            return;
-        }
         tokens.forEach((tok, i) => {
-            const span = document.createElement('span');
-            span.textContent = tok;
-            span.className = 'token ' + (tok === EOS_TOKEN ? 'eos-token' : i < promptCount ? 'prompt-token' : 'context-token');
-            contextDisplay.appendChild(span);
+            contextDisplay.appendChild(tokenChip(tok,
+                tok === EOS_TOKEN ? 'eos-token' : i < promptCount ? 'prompt-token' : 'context-token'));
         });
+        if (!generationComplete) appendNextSlot();
         tokenCount.textContent = tokenCountLabel(tokens.length);
+    }
+
+    // Idle: the prompt's words as ghost chips, before Start splits them into tokens
+    function renderIdleContext() {
+        contextDisplay.innerHTML = '';
+        basicTokenize(example().prompt).forEach(w => contextDisplay.appendChild(tokenChip(w, 'ghost-token')));
+        appendNextSlot();
+        contextDisplay.insertAdjacentHTML('beforeend', `<div class="basis-full mt-2">${placeholder('clickStart')}</div>`);
+        tokenCount.textContent = tokenCountLabel(0);
+    }
+
+    // Before the first prediction: empty rows in the shape of a distribution
+    function renderSkeletonRows(hintKey) {
+        nextTokenDisplay.innerHTML = `<div>${placeholder(hintKey)}</div>` + SKELETON_BARS.map((w, i) => `
+            <div class="prob-row skeleton px-3 py-2" aria-hidden="true">
+                <div class="flex items-center justify-between mb-1.5">
+                    <span class="ghost-chip" style="width:${84 - i * 10}px"></span><span class="pct">–%</span>
+                </div>
+                <div class="prob-bar-track"><div class="prob-bar-fill" style="width:${w}%"></div></div>
+            </div>`).join('');
+    }
+
+    function renderIdleOutput() {
+        outputDisplay.innerHTML = placeholder('outputPlaceholder')
+            + '<div class="ghost-line" style="width:92%"></div><div class="ghost-line" style="width:61%"></div>';
     }
 
     // ─── Render: probability rows ──────────────────────────────────────────────
@@ -1079,6 +1204,9 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
             renderProbabilities(possibilities, nextToken, adjustedProbs);
         }
 
+        setStep(currentContextTokens.length - promptCount);
+        if (generationComplete) setPhase('done');
+
         const text = reconstructText(generatedTokens);
         outputDisplay.textContent = text || '';
         if (!text && generationComplete) {
@@ -1098,10 +1226,11 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
         resetButton.disabled  = false;
         setGenerateButton(true, 'generate');
 
-        visualizationArea.classList.remove('hidden');
+        setPhase('running');
+        setStep(0);
         renderContext(currentContextTokens, promptTokens.length);
-        nextTokenDisplay.innerHTML = placeholder('clickGenerate');
-        outputDisplay.innerHTML    = placeholder('outputPlaceholder');
+        renderSkeletonRows('clickGenerate');
+        renderIdleOutput();
     }
 
     function resetApplication() {
@@ -1115,11 +1244,11 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
         resetButton.disabled  = true;
         setGenerateButton(false, 'generate');
 
-        visualizationArea.classList.add('hidden');
-        contextDisplay.innerHTML    = placeholder('clickStart');
-        nextTokenDisplay.innerHTML  = placeholder('waiting');
-        outputDisplay.innerHTML     = placeholder('outputPlaceholder');
-        tokenCount.textContent = '';
+        setPhase('idle');
+        setStep(0);
+        renderIdleContext();
+        renderSkeletonRows('clickStart');
+        renderIdleOutput();
 
         fixedPromptDisplay.textContent = example().prompt;
     }
@@ -1135,6 +1264,7 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
         lang = initialLanguage();
         resetApplication();
         applyLanguage();
+        if (window.lucide) lucide.createIcons();
     };
 </script>
 
