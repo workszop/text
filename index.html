@@ -250,9 +250,8 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
         .app-title {
             font-family: var(--font-display); font-weight: 800;
             font-size: clamp(2.3rem, 5vw, 3.3rem); letter-spacing: -0.025em;
-            line-height: 1.05; color: var(--ink); margin: 0 0 14px;
+            line-height: 1.05; color: var(--ink); margin: 0;
         }
-        .edu-lead { font-family: var(--font-sans); font-size: 1.15rem; line-height: 1.6; color: var(--ink-2); margin: 0; }
 
         /* Cards ------------------------------------------------------------- */
         /* Card anatomy: --line-2 contour, stone head strip, white body */
@@ -400,7 +399,6 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
     <!-- Title -->
     <header class="page-header">
         <h1 class="app-title" data-i18n="title">LLM Text Generation Simulation</h1>
-        <p class="edu-lead" data-i18n="intro"></p>
     </header>
 
     <div id="app" class="app-layout" data-phase="idle" data-step="0">
@@ -558,7 +556,6 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
         pl: {
             docTitle:          'Symulacja generowania tekstu przez LLM · edulab',
             title:             'Symulacja generowania tekstu przez LLM',
-            intro:             'Zobacz krok po kroku, jak model językowy składa tekst. Za każdym razem wybiera jeden token z rozkładu kandydatów: całe słowo albo jego kawałek, np. ##czką.',
             prompt:            'Prompt',
             temperature:       'Temperatura',
             start:             'Start',
@@ -598,7 +595,6 @@ body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-
         en: {
             docTitle:          'LLM Text Generation Simulation · edulab',
             title:             'LLM Text Generation Simulation',
-            intro:             'Step through next-token prediction and watch a language model build text one token at a time (whole words or word-pieces like ##ist), each one picked from a distribution of candidates.',
             prompt:            'Prompt',
             temperature:       'Temperature',
             start:             'Start',
