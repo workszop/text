@@ -1,0 +1,1257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How the context window works · edulab</title>
+    <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap">
+    <link rel="stylesheet" href="shared.css">
+    <script src="shared.js"></script>
+    <style>
+        /* Page styles – tokens and chrome live in shared.css (no Tailwind on this page) */
+        *, *::before, *::after { box-sizing: border-box; }
+        body { margin: 0; min-height: 100vh; }
+        h1, h2, h3, h4, p { margin: 0; }
+        button { font: inherit; }
+        .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+        /* Section bands: white / stone, full width with fluid side margins like index.html */
+        .band { padding: 22px var(--gutter) 40px; }
+        .band + .band { border-top: 1px solid var(--line); }
+        .band-stone { background: var(--paper-2); padding-top: 36px; padding-bottom: 56px; }
+        .band-white { padding-top: 36px; padding-bottom: 70px; }
+
+        .sec-head { display: flex; align-items: center; gap: 14px; margin: 0 0 14px; }
+        .sec-head h2 { font-family: var(--font-display); font-weight: 700; font-size: var(--h3); letter-spacing: -0.015em; color: var(--ink); }
+        .sec-head::after { content: ''; flex: 1; height: 1px; background: var(--line-2); }
+        .badge-lg { width: 46px; height: 46px; border-radius: var(--r-md); }
+        .badge-lg .ic { width: 22px; height: 22px; }
+        .sec-lead { font-family: var(--font-sans); font-size: 1.15rem; line-height: 1.6; color: var(--ink-2); margin-bottom: 20px; }
+
+        /* Category fills (labelled in every legend) */
+        .k-system  { background: var(--ink-3);     color: var(--paper); }
+        .k-tools   { background: var(--ink);       color: var(--paper); }
+        .k-user, .k-conv { background: var(--blue-soft);  color: var(--blue-ink); }
+        .k-model   { background: var(--green-soft); color: var(--green-ink); }
+        .k-file    { background: var(--yellow);     color: var(--yellow-ink); }
+        .k-chunk   { background: var(--yellow) repeating-linear-gradient(135deg, transparent 0 6px,
+                         color-mix(in srgb, var(--ink) 16%, transparent) 6px 8px);
+                     color: var(--yellow-ink); }   /* striped: pieces of the document */
+        .k-summary { background: var(--grape-soft); color: var(--grape-ink); }
+        .k-reserve { background: var(--surface);    color: var(--ink-2); border: 1px dashed var(--line-strong); }
+        .k-free    { background: var(--paper-2);    color: var(--ink-3); }
+
+        /* ─── Budget bar ─── */
+        .scale { display: flex; justify-content: space-between; gap: 12px; margin: 22px 0 8px;
+            font-family: var(--font-mono); font-size: 15px; font-weight: 500; color: var(--ink); }
+        .budget-bar { display: flex; height: 72px; border-radius: var(--r-sm); overflow: hidden;
+            background: var(--paper-2); border: 1.5px solid var(--line-2); }
+        .budget-bar.over { border-color: var(--red-600); }
+        .budget-bar .seg { height: 100%; flex: none; transition: width 0.25s ease; }
+        .budget-bar .seg + .seg { border-left: 1px solid var(--surface); }
+        .budget-under { position: relative; height: 34px; margin-top: 8px; }
+        .budget-pct { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap;
+            font-family: var(--font-display); font-weight: 700; font-size: 19px; color: var(--ink); transition: left 0.25s ease; }
+        .budget-pct.over { color: var(--red-600); }
+        .slider-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-top: 10px; }
+        .slider-row input { flex: 1 1 260px; }
+        .slider-value { font-family: var(--font-mono); font-size: 13px; color: var(--ink-2); min-width: 220px; }
+        .legend-count { font-family: var(--font-mono); font-size: 12px; color: var(--ink); }
+
+        /* Range: --track rail, yellow thumb with an ink ring (>= 3:1 on white) */
+        input[type=range] { -webkit-appearance: none; appearance: none; height: 28px; background: transparent; cursor: pointer; }
+        input[type=range]::-webkit-slider-runnable-track { height: 6px; border-radius: var(--r-pill); background: var(--track); }
+        input[type=range]::-moz-range-track { height: 6px; border-radius: var(--r-pill); background: var(--track); }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; margin-top: -8px;
+            border-radius: 50%; background: var(--yellow); border: 2px solid var(--ink); }
+        input[type=range]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--yellow); border: 2px solid var(--ink); }
+
+        /* ─── Simulator ─── */
+        .stack { display: flex; flex-direction: column; gap: 16px; }
+        .ctrl-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px; }
+        .ctrl-row + .ctrl-row { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--line-2); }
+        .ctrl-group { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+        .ctrl-row .edu-btn { padding: 8px 14px; }
+        .rail-narrow { --rail-w: 160px; }
+        .btn-sm { padding: 6px 12px; font-size: 13px; }
+        .opt-btn { border: none; background: transparent; padding: 6px 16px; border-radius: var(--r-pill);
+            font-family: var(--font-sans); font-weight: 600; font-size: 14px; color: var(--ink-2); cursor: pointer;
+            transition: background 0.15s, color 0.15s; }
+        .opt-btn.active { background: var(--yellow); color: var(--yellow-ink); }
+        .edu-btn .ic { width: 15px; height: 15px; }
+        kbd { font-family: var(--font-mono); font-size: 11px; padding: 1px 6px; border-radius: var(--r-xs);
+            background: var(--paper-3); color: var(--ink); }
+        .edu-btn-primary kbd { background: color-mix(in srgb, var(--ink) 12%, transparent); }
+
+        /* --sim-h is set by fitSimHeight() so controls + chat + window fit one screen */
+        .sim-grid { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 16px; align-items: stretch; }
+        .sim-grid > .edu-card { display: flex; flex-direction: column; }
+        .sim-grid .card-body { flex: 1 1 auto; display: flex; flex-direction: column; }
+
+        /* Transcript */
+        .transcript { flex: 1 1 auto; display: flex; flex-direction: column; gap: 10px; height: var(--sim-h, 520px); overflow-y: auto; padding-right: 4px; }
+        .msg { max-width: 88%; padding: 10px 14px; border-radius: var(--r-md); font-size: 15px; line-height: 1.5; }
+        .msg-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-bottom: 4px;
+            font-family: var(--font-mono); font-size: 11px; font-weight: 500; letter-spacing: .04em; }
+        .msg-user  { align-self: flex-end; background: var(--blue-soft); color: var(--blue-ink); }
+        .msg-model { align-self: flex-start; background: var(--surface); color: var(--ink); border: 1px solid var(--line-2); }
+        .msg-file  { align-self: flex-end; background: var(--yellow); color: var(--yellow-ink); font-family: var(--font-mono); font-size: 13px; }
+        .msg-chunk { align-self: flex-start; max-width: 70%; font-family: var(--font-mono); font-size: 12px; }
+        .msg[data-state="out"], .msg[data-state="summary"], .msg[data-state="index"] {
+            background: var(--paper-2); color: var(--ink-3); border: 1px dashed var(--line-strong); }
+        .flag { padding: 1px 8px; border-radius: var(--r-pill); text-transform: uppercase; letter-spacing: .08em; font-size: 10px; }
+        .flag-out { background: var(--ink-3); color: var(--paper); }
+        .flag-summary { background: var(--grape-soft); color: var(--grape-ink); }
+        .flag-in { background: var(--green-soft); color: var(--green-ink); }
+        .flag-partial { background: var(--yellow); color: var(--yellow-ink); }
+        .flag-missing { background: var(--red-soft); color: var(--red-ink); }
+        .note { align-self: stretch; display: flex; flex-direction: column; gap: 4px; padding: 8px 12px; border-radius: var(--r-sm);
+            font-family: var(--font-mono); font-size: 12px; line-height: 1.5; }
+        .note-drop { background: var(--paper-3); color: var(--ink); }
+        .note-summary { background: var(--grape-soft); color: var(--grape-ink); }
+        .note-reject { background: var(--red-soft); color: var(--red-ink); }
+        .note-scen { background: var(--paper-2); color: var(--ink-2); font-family: var(--font-sans); font-size: 14px; }
+        .empty-hint { margin: auto; text-align: center; color: var(--ink-3); font-size: 15px; max-width: 34ch; }
+
+        /* Window column: fixed height = capacity, block height = tokens */
+        .meter { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px;
+            font-family: var(--font-mono); font-size: 12px; color: var(--ink-2); }
+        .meter strong { font-size: 15px; color: var(--ink); font-weight: 600; }
+        .window-row { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 14px; align-items: start; }
+        .window-box { display: flex; flex-direction: column; height: var(--sim-h, 460px); border-radius: var(--r-sm); overflow: hidden;
+            background: var(--paper-2); border: 1.5px solid var(--line-2); }
+        .window-box.over { border-color: var(--red-600); }
+        .blk { flex: none; display: flex; align-items: center; gap: 6px; padding: 0 8px; overflow: hidden; white-space: nowrap;
+            font-family: var(--font-mono); font-size: 11px; font-weight: 500; border-bottom: 1px solid var(--surface);
+            transition: height 0.3s ease; }
+        .blk .n { margin-left: auto; opacity: .85; }
+        .blk.k-reserve { border-bottom: none; }
+        .blk.k-free { flex: 1 1 auto; justify-content: center; border-bottom: none; }
+        .blk.fresh { animation: fadeIn 0.45s cubic-bezier(.32,.72,.32,1); }
+        .index-box { margin-top: 14px; padding: 8px 10px; border-radius: var(--r-sm); border: 1px dashed var(--line-strong);
+            font-family: var(--font-mono); font-size: 11px; line-height: 1.5; color: var(--ink-2); background: var(--surface); }
+        .index-box[hidden] { display: none; }
+        .legend-grid { display: grid; grid-template-columns: 1fr; gap: 5px; width: 100%; }   /* one row per category, count on the right */
+        .legend-grid .legend-item { min-width: 0; }
+        .legend-grid .swatch { flex: none; }
+        .legend-grid .meta-label { min-width: 0; white-space: normal; }
+        .legend-grid .legend-count { flex: none; margin-left: auto; white-space: nowrap; font-size: 11px; color: var(--ink-2); }
+
+        /* Stat blocks: solid fills */
+        .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+        .stat { border-radius: var(--r-lg); padding: 14px 18px; }
+        .stat .v { display: block; font-family: var(--font-display); font-weight: 700; font-size: 30px; line-height: 1.1; }
+        .stat .l { display: block; margin-top: 4px; font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .1em; }
+
+        /* ─── Real apps: icon tiles ─── */
+        .tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+        .tile { display: flex; flex-direction: column; }
+        .tile .card-body { flex: 1 1 auto; font-size: 15px; line-height: 1.6; color: var(--ink-2); }
+        .tile .card-foot { flex-direction: column; align-items: flex-start; gap: 8px; }
+        .tile .chip { font-family: var(--font-mono); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .08em;
+            padding: 3px 10px; border-radius: var(--r-pill); }
+        .tile .src { font-size: 13px; line-height: 1.45; color: var(--ink-3); }
+        .tile .src a { color: var(--blue-600); }
+        .tile .src a:hover { color: var(--ink); }
+
+        @media (max-width: 1400px) {
+            .wide #sim.app-layout { grid-template-columns: 1fr; }
+            #sim .app-guide { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+        @media (max-width: 960px) {
+            .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+        @media (max-width: 768px) {
+            .sim-grid { grid-template-columns: 1fr; }
+            .transcript { height: 420px; }
+            .window-box { height: 380px; }
+            .window-row { grid-template-columns: 140px minmax(0, 1fr); }
+            .stats { grid-template-columns: 1fr; }
+            .scale { font-size: 12px; }
+            .slider-value { min-width: 0; }
+            .tiles { grid-template-columns: 1fr; }
+            #sim .app-guide { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body class="edu wide">
+
+<!-- edulab branded header -->
+<header class="edu-header">
+    <div class="edu-header-inner">
+        <img class="edu-logo" alt="edulab" src="edulab-mark-ink.png">
+        <span class="edu-wordmark">edulab</span>
+        <nav class="edu-nav" aria-label="Pages">
+            <a href="index.html" data-i18n="navGen">Generation</a>
+            <a href="context.html" aria-current="page" data-i18n="navCtx">Context window</a>
+        </nav>
+        <div class="edu-seg" role="group" aria-label="Language">
+            <button class="lang-btn" data-lang="pl" type="button">PL</button>
+            <button class="lang-btn" data-lang="en" type="button">EN</button>
+        </div>
+    </div>
+</header>
+
+<main>
+<!-- ─── Band 1: the budget ─── -->
+<section class="band">
+<div class="wrap">
+    <header class="page-header">
+        <h1 class="app-title" data-i18n="title">How the context window works</h1>
+    </header>
+
+    <div class="sec-head">
+        <span class="badge badge-lg tone-ink"><i data-lucide="gauge" class="ic"></i></span>
+        <h2 data-i18n="budgetTitle">Context is a budget</h2>
+    </div>
+    <p class="sec-lead" data-i18n="budgetText"></p>
+
+    <div id="budget" class="edu-card" data-used="0" data-used-pct="0" data-overflow="false">
+        <div class="card-body">
+            <div class="scale"><span>0</span><span data-i18n="scaleMax"></span></div>
+            <div id="budgetBar" class="budget-bar" role="img">
+                <div class="seg k-system" data-seg="system"></div>
+                <div class="seg k-tools"  data-seg="tools"></div>
+                <div class="seg k-conv"   data-seg="conv"></div>
+                <div class="seg k-file"   data-seg="files"></div>
+            </div>
+            <div class="budget-under"><span id="budgetPct" class="budget-pct"></span></div>
+            <div class="slider-row">
+                <label class="field-label" for="sessionSlider" data-i18n="sessionLabel">Session length</label>
+                <input id="sessionSlider" type="range" min="0" max="100" value="56">
+                <span id="sessionValue" class="slider-value"></span>
+            </div>
+        </div>
+        <div class="card-foot" aria-label="Legend">
+            <span class="legend-item"><span class="swatch k-system"></span><span class="meta-label" data-i18n="segSystem"></span><span class="legend-count" data-count="system"></span></span>
+            <span class="legend-item"><span class="swatch k-tools"></span><span class="meta-label" data-i18n="segTools"></span><span class="legend-count" data-count="tools"></span></span>
+            <span class="legend-item"><span class="swatch k-conv"></span><span class="meta-label" data-i18n="segConv"></span><span class="legend-count" data-count="conv"></span></span>
+            <span class="legend-item"><span class="swatch k-file"></span><span class="meta-label" data-i18n="segFiles"></span><span class="legend-count" data-count="files"></span></span>
+            <span class="legend-item"><span class="swatch k-free"></span><span class="meta-label" data-i18n="segFree"></span><span class="legend-count" data-count="free"></span></span>
+        </div>
+    </div>
+</div>
+</section>
+
+<!-- ─── Band 2: the simulation ─── -->
+<section class="band band-stone">
+<div class="wrap">
+    <div class="sec-head">
+        <span class="badge badge-lg tone-ink"><i data-lucide="file-text" class="ic"></i></span>
+        <h2 data-i18n="simTitle">A conversation about a document</h2>
+    </div>
+    <p class="sec-lead" data-i18n="simLead"></p>
+
+    <div id="sim" class="app-layout" data-scenario="policy" data-doc-mode="full" data-doc-state="none" data-phase="ready"
+         data-turn="0" data-used="0" data-capacity="256000" data-strategy="drop" data-out="0" data-summarized="0">
+    <div class="app-column stack">
+
+        <!-- Controls -->
+        <div id="controlsCard" class="edu-card rail rail-narrow">
+            <div class="card-head">
+                <span class="badge tone-ink"><i data-lucide="sliders-horizontal" class="ic"></i></span>
+                <h3 class="card-title" data-i18n="controlsTitle">Conversation</h3>
+                <span class="head-meta">
+                    <span class="meta-label"><span data-i18n="turnLabel">Turn</span> <span id="turnCount">0</span></span>
+                    <span id="phaseChip" class="sr-only" role="status" aria-live="polite"></span>
+                </span>
+                <button id="resetBtn" class="edu-btn edu-btn-ghost btn-sm" type="button" aria-keyshortcuts="R">
+                    <i data-lucide="rotate-ccw" class="ic"></i>
+                    <span data-i18n="reset">Reset</span> <kbd>R</kbd>
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="ctrl-row">
+                    <span class="ctrl-group">
+                        <span id="scenLabel" class="field-label" data-i18n="scenLabel">Scenario</span>
+                        <span class="edu-seg" style="margin-left:0" role="group" aria-labelledby="scenLabel">
+                            <button class="opt-btn" data-scenario="policy" type="button" data-i18n="scenPolicy"></button>
+                            <button class="opt-btn" data-scenario="report" type="button" data-i18n="scenReport"></button>
+                        </span>
+                    </span>
+                    <span class="ctrl-group">
+                        <span id="docModeLabel" class="field-label" data-i18n="docModeLabel">Document</span>
+                        <span class="edu-seg" style="margin-left:0" role="group" aria-labelledby="docModeLabel">
+                            <button class="opt-btn" data-doc-mode="full" type="button" data-i18n="modeFull"></button>
+                            <button class="opt-btn" data-doc-mode="rag" type="button" data-i18n="modeRag"></button>
+                        </span>
+                    </span>
+                    <span class="ctrl-group">
+                        <span id="strategyLabel" class="field-label" data-i18n="strategyLabel">When it's full</span>
+                        <span class="edu-seg" style="margin-left:0" role="group" aria-labelledby="strategyLabel">
+                            <button class="opt-btn" data-strategy="drop" type="button" data-i18n="stDrop"></button>
+                            <button class="opt-btn" data-strategy="summary" type="button" data-i18n="stSum"></button>
+                            <button class="opt-btn" data-strategy="stop" type="button" data-i18n="stStop"></button>
+                        </span>
+                    </span>
+                </div>
+                <div class="ctrl-row">
+                    <button id="nextBtn" class="edu-btn edu-btn-primary" type="button" aria-keyshortcuts="N">
+                        <i data-lucide="play" class="ic"></i>
+                        <span data-i18n="nextTurn">Next turn</span> <kbd>N</kbd>
+                    </button>
+                    <span class="ctrl-group">
+                        <span class="field-label" data-i18n="askLabel">Ask</span>
+                        <button class="edu-btn edu-btn-ghost probe-btn" data-probe="detail" type="button" aria-keyshortcuts="1">
+                            <span data-i18n="askDetail"></span> <kbd>1</kbd>
+                        </button>
+                        <button class="edu-btn edu-btn-ghost probe-btn" data-probe="global" type="button" aria-keyshortcuts="2">
+                            <span data-i18n="askGlobal"></span> <kbd>2</kbd>
+                        </button>
+                        <button class="edu-btn edu-btn-ghost probe-btn" data-probe="memory" type="button" aria-keyshortcuts="3">
+                            <span data-i18n="askMemory"></span> <kbd>3</kbd>
+                        </button>
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <div id="simGrid" class="sim-grid">
+            <!-- What the user sees -->
+            <div class="edu-card">
+                <div class="card-head">
+                    <span class="badge tone-blue"><i data-lucide="message-square" class="ic"></i></span>
+                    <h3 class="card-title" data-i18n="chatTitle">Chat</h3>
+                    <span class="head-meta"><span class="meta-label" data-i18n="chatMeta"></span></span>
+                </div>
+                <div class="card-body">
+                    <div id="transcript" class="transcript" tabindex="0" aria-label="Chat"></div>
+                </div>
+            </div>
+
+            <!-- What the model sees: the bar at true scale, the legend with counts beside it -->
+            <div class="edu-card">
+                <div class="card-head">
+                    <span class="badge tone-green"><i data-lucide="layers" class="ic"></i></span>
+                    <h3 class="card-title" data-i18n="windowTitle">Context window</h3>
+                    <span class="head-meta"><span class="meta-label" data-i18n="windowMeta"></span></span>
+                </div>
+                <div class="card-body">
+                    <div class="meter"><span><strong id="meterUsed"></strong> / <span id="meterCap"></span></span></div>
+                    <div class="window-row">
+                        <div id="windowBox" class="window-box" role="img"></div>
+                        <div class="window-side">
+                            <div class="legend-grid" aria-label="Legend">
+                                <span class="legend-item"><span class="swatch k-system"></span><span class="meta-label" data-i18n="segSystem"></span><span class="legend-count" data-wcount="system"></span></span>
+                                <span class="legend-item"><span class="swatch k-tools"></span><span class="meta-label" data-i18n="segTools"></span><span class="legend-count" data-wcount="tools"></span></span>
+                                <span class="legend-item"><span class="swatch k-file"></span><span class="meta-label" data-i18n="segDoc"></span><span class="legend-count" data-wcount="doc"></span></span>
+                                <span class="legend-item"><span class="swatch k-chunk"></span><span class="meta-label" data-i18n="segChunks"></span><span class="legend-count" data-wcount="chunks"></span></span>
+                                <span class="legend-item"><span class="swatch k-user"></span><span class="meta-label" data-i18n="youLabel"></span><span class="legend-count" data-wcount="user"></span></span>
+                                <span class="legend-item"><span class="swatch k-model"></span><span class="meta-label" data-i18n="modelLabel"></span><span class="legend-count" data-wcount="model"></span></span>
+                                <span class="legend-item"><span class="swatch k-summary"></span><span class="meta-label" data-i18n="blkSummary"></span><span class="legend-count" data-wcount="summary"></span></span>
+                                <span class="legend-item"><span class="swatch k-reserve"></span><span class="meta-label" data-i18n="segReserve"></span><span class="legend-count" data-wcount="reserve"></span></span>
+                                <span class="legend-item"><span class="swatch k-free"></span><span class="meta-label" data-i18n="segFree"></span><span class="legend-count" data-wcount="free"></span></span>
+                            </div>
+                            <div id="indexBox" class="index-box" hidden></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats">
+            <div class="stat tone-yellow"><span id="statRead" class="v">0</span><span class="l" data-i18n="statRead"></span></div>
+            <div class="stat tone-blue"><span id="statTotal" class="v">0</span><span class="l" data-i18n="statTotal"></span></div>
+            <div class="stat tone-ink"><span id="statOut" class="v">0</span><span class="l" data-i18n="statOut"></span></div>
+        </div>
+    </div><!-- /app-column -->
+
+    <aside class="app-guide" aria-label="Guide">
+        <div class="guide-card">
+            <h4><span class="badge badge-sm tone-ink"><i data-lucide="repeat" class="ic"></i></span><span data-i18n="guide1Title"></span></h4>
+            <p data-i18n="guide1Body"></p>
+        </div>
+        <div class="guide-card">
+            <h4><span class="badge badge-sm tone-yellow"><i data-lucide="file-search" class="ic"></i></span><span data-i18n="guide2Title"></span></h4>
+            <p data-i18n="guide2Body"></p>
+        </div>
+        <div class="guide-card">
+            <h4><span class="badge badge-sm tone-green"><i data-lucide="scissors" class="ic"></i></span><span data-i18n="guide3Title"></span></h4>
+            <p data-i18n="guide3Body"></p>
+        </div>
+        <div class="guide-card">
+            <h4><span class="badge badge-sm tone-grape"><i data-lucide="circle-help" class="ic"></i></span><span data-i18n="guide4Title"></span></h4>
+            <p data-i18n="guide4Body"></p>
+        </div>
+    </aside>
+    </div><!-- /app-layout -->
+</div>
+</section>
+
+<!-- ─── Band 3: what real apps do ─── -->
+<section class="band band-white">
+<div class="wrap">
+    <div class="sec-head">
+        <span class="badge badge-lg tone-ink"><i data-lucide="globe" class="ic"></i></span>
+        <h2 data-i18n="realTitle">What real apps do</h2>
+    </div>
+    <p class="sec-lead" data-i18n="realLead"></p>
+
+    <div class="tiles">
+        <div class="edu-card tile">
+            <div class="card-head"><span class="badge tone-blue"><i data-lucide="ruler" class="ic"></i></span><h3 class="card-title" data-i18n="rt1Title"></h3></div>
+            <div class="card-body" data-i18n="rt1Body"></div>
+            <div class="card-foot">
+                <span class="src"><span data-i18n="srcLabel"></span> <a href="https://chatgpt.com/pricing/" target="_blank" rel="noopener" data-i18n="rt1Src"></a></span>
+            </div>
+        </div>
+        <div class="edu-card tile">
+            <div class="card-head"><span class="badge tone-blue"><i data-lucide="file-search" class="ic"></i></span><h3 class="card-title" data-i18n="rt2Title"></h3></div>
+            <div class="card-body" data-i18n="rt2Body"></div>
+            <div class="card-foot">
+                <span class="chip tone-yellow" data-i18n="rt2Chip"></span>
+                <span class="src"><span data-i18n="srcLabel"></span> <a href="https://help.openai.com/en/articles/10029836-optimizing-file-uploads-in-chatgpt-enterprise" target="_blank" rel="noopener" data-i18n="rt2Src"></a>, <a href="https://help.openai.com/en/articles/8555545-uploading-files-and-audio-to-chatgpt" target="_blank" rel="noopener" data-i18n="rt2Src2"></a></span>
+            </div>
+        </div>
+        <div class="edu-card tile">
+            <div class="card-head"><span class="badge tone-blue"><i data-lucide="message-square-warning" class="ic"></i></span><h3 class="card-title" data-i18n="rt3Title"></h3></div>
+            <div class="card-body" data-i18n="rt3Body"></div>
+            <div class="card-foot">
+                <span class="chip tone-yellow" data-i18n="rt3Chip"></span>
+                <span class="src"><span data-i18n="srcObserved"></span> <a href="https://community.openai.com/t/chatgpt-conversations-are-reaching-maximum-length-much-sooner-than-before/1403182" target="_blank" rel="noopener" data-i18n="rt3Src"></a></span>
+            </div>
+        </div>
+        <div class="edu-card tile">
+            <div class="card-head"><span class="badge tone-grape"><i data-lucide="messages-square" class="ic"></i></span><h3 class="card-title" data-i18n="rt4Title"></h3></div>
+            <div class="card-body" data-i18n="rt4Body"></div>
+            <div class="card-foot">
+                <span class="chip tone-yellow" data-i18n="rt4Chip"></span>
+                <span class="src"><span data-i18n="srcLabel"></span> <a href="https://support.claude.com/en/articles/8606394-how-large-is-the-context-window-on-paid-claude-plans" target="_blank" rel="noopener" data-i18n="rt4Src"></a>, <a href="https://support.claude.com/en/articles/11647753-how-do-usage-and-length-limits-work" target="_blank" rel="noopener" data-i18n="rt4Src2"></a></span>
+            </div>
+        </div>
+        <div class="edu-card tile">
+            <div class="card-head"><span class="badge tone-grape"><i data-lucide="folder-search" class="ic"></i></span><h3 class="card-title" data-i18n="rt5Title"></h3></div>
+            <div class="card-body" data-i18n="rt5Body"></div>
+            <div class="card-foot">
+                <span class="chip tone-yellow" data-i18n="rt5Chip"></span>
+                <span class="src"><span data-i18n="srcLabel"></span> <a href="https://support.claude.com/en/articles/11473015-retrieval-augmented-generation-rag-for-projects" target="_blank" rel="noopener" data-i18n="rt5Src"></a></span>
+            </div>
+        </div>
+        <div class="edu-card tile">
+            <div class="card-head"><span class="badge tone-ink"><i data-lucide="code" class="ic"></i></span><h3 class="card-title" data-i18n="rt6Title"></h3></div>
+            <div class="card-body" data-i18n="rt6Body"></div>
+            <div class="card-foot">
+                <span class="chip tone-yellow" data-i18n="rt6Chip"></span>
+                <span class="src"><span data-i18n="srcLabel"></span> <a href="https://platform.claude.com/docs/en/build-with-claude/context-windows" target="_blank" rel="noopener" data-i18n="rt6Src"></a></span>
+            </div>
+        </div>
+    </div>
+</div>
+</section>
+</main>
+
+<div id="live" class="sr-only" aria-live="polite"></div>
+
+<script>
+    // ─── Constants ────────────────────────────────────────────────────────────
+    // Budget explainer: a 1M-token window, numbers illustrative.
+    const BUDGET_CAP     = 1000000;
+    const BUDGET_SYSTEM  = 26000;
+    const BUDGET_TOOLS   = 40000;
+    const CONV_PER_STEP  = 7600;     // slider 0..100 → 0..760k tokens of conversation
+    const FILE_EVERY     = 14;       // one file read every 14 slider steps...
+    const FILE_TOKENS    = 32000;    // ...of 32k tokens each (100 → 105%: it overflows)
+    const MSGS_PER_STEP  = 1.6;
+
+    // Simulation: a realistic window. 256k = ChatGPT Plus/Go with a reasoning model
+    // (chatgpt.com/pricing, checked 2026-10-28); Claude chat models have 200k-1M.
+    const CAPACITY       = 256000;
+    const SYSTEM_TOKENS  = 4000;     // system instructions, personality, memory
+    const TOOLS_TOKENS   = 12000;    // tool definitions (search, files, code...)
+    const RESERVE_TOKENS = 32000;    // room for the reply and its reasoning
+    const RAG_TOKENS     = 4000;     // three retrieved passages per search
+    const KEEP_RAW       = 2;        // summarizing keeps the last exchange verbatim
+    const SUMMARY_BASE   = 3000;     // a compaction summary of the earlier conversation...
+    const SUMMARY_PER_FACT = 300;    // ...grows a little with each fact it keeps
+    const MIN_BLOCK_PX   = 3;
+    const SIM_MIN_H      = 240;      // the chat and the window bar never shrink below this...
+    const SIM_MAX_H      = 640;      // ...or grow past this, whatever the screen
+    const FIT_MARGIN     = 12;       // breathing room at the top and bottom of the screen
+    const LABEL_MIN_PX   = 15;
+    const PHASES = {                 // phase → status label key (announced, not shown)
+        ready:    'phaseReady',
+        fits:     'phaseFits',
+        trimmed:  'phaseTrimmed',
+        rejected: 'phaseRejected',
+        done:     'phaseDone',
+    };
+
+    // Two scripted conversations. Turn 1 attaches the document. `facts` are what a
+    // summary keeps (who is asking and why, the gist of the document); numbers,
+    // page references and lists are details a summary drops. `rt` is the visible
+    // reply, `think` its hidden reasoning: it stays in the window on later turns
+    // (as on newer Claude models) and counts toward the limit, but the chat never
+    // shows it.
+    const SCENARIOS = {
+        policy: {                    // 18 pages: fits with lots of room to spare
+            doc: { tokens: 12000, pages: 18 },
+            turns: [
+                { ut: 60, facts: ['who'], withDoc: true, rt: 700, think: 1500 },
+                { ut: 25, rt: 450, think: 800 }, { ut: 25, rt: 520, think: 900 }, { ut: 20, rt: 480, think: 700 },
+                { ut: 25, rt: 400, think: 600 }, { ut: 30, rt: 650, think: 1200 },
+            ],
+        },
+        report: {                    // 420 pages: almost the whole window
+            doc: { tokens: 203000, pages: 420 },
+            turns: [
+                { ut: 70, facts: ['who'], withDoc: true, rt: 1400, think: 3000 },
+                { ut: 25, rt: 900, think: 2000 }, { ut: 30, rt: 1600, think: 2500 }, { ut: 35, rt: 1300, think: 2500 },
+                { ut: 25, rt: 1100, think: 1500 }, { ut: 25, rt: 1000, think: 1500 }, { ut: 40, rt: 1800, think: 3000 },
+            ],
+        },
+    };
+    // Test questions: a page-level detail, a whole-document question, and the
+    // start of the conversation. `search` = the question triggers retrieval in RAG mode.
+    const PROBES = {
+        detail: { qt: 25, at: 120, think: 600,  search: true },
+        global: { qt: 30, at: 420, think: 2500, search: true },
+        memory: { qt: 20, at: 60,  think: 200,  search: false },
+    };
+
+    // ─── i18n ─────────────────────────────────────────────────────────────────
+    const T = {
+        pl: {
+            navGen: 'Generowanie', navCtx: 'Okno kontekstu',
+            docTitle: 'Jak działa okno kontekstu · edulab',
+            title: 'Jak działa okno kontekstu',
+            budgetTitle: 'Kontekst to budżet',
+            budgetText: 'Wszystko, na podstawie czego model odpowiada, musi zmieścić się w jednym oknie: stałe instrukcje, opisy narzędzi, cała rozmowa i każdy plik, który model przeczytał. Przesuń suwak w prawo.',
+            scaleMax: '1 milion tokenów, całe okno',
+            sessionLabel: 'Długość sesji',
+            sessionValue: 'wiadomości: {m}, przeczytane pliki: {f}',
+            usedPct: 'zajęte: {p}%',
+            overBy: '{p}%: {n} tokenów się nie mieści',
+            segSystem: 'instrukcje', segTools: 'narzędzia', segConv: 'rozmowa', segFiles: 'pliki', segFree: 'wolne',
+            segDoc: 'dokument', segChunks: 'fragmenty (RAG)',
+            simTitle: 'Rozmowa o dokumencie',
+            simLead: 'Okno ma 256 tys. tokenów, tyle co ChatGPT Plus z modelem rozumującym. Instrukcje i narzędzia zajmują 16 tys., a 32 tys. zostaje na odpowiedź i rozumowanie. Rozumowanie nie pojawia się w czacie, ale zostaje w oknie i liczy się do limitu. Wybierz scenariusz, prowadź rozmowę i zadawaj pytania testowe.',
+            controlsTitle: 'Rozmowa', turnLabel: 'Tura',
+            scenLabel: 'Scenariusz', scenPolicy: '1: regulamin', scenReport: '2: raport roczny',
+            nextTurn: 'Następna tura', reset: 'Reset',
+            askLabel: 'Zapytaj', askDetail: 'o szczegół', askGlobal: 'o całość', askMemory: 'o początek',
+            docModeLabel: 'Dokument', modeFull: 'Cały w oknie', modeRag: 'RAG',
+            strategyLabel: 'Gdy brak miejsca',
+            stDrop: 'Usuń najstarsze', stSum: 'Streść', stStop: 'Zatrzymaj',
+            phaseReady: 'Gotowe', phaseFits: 'Mieści się', phaseTrimmed: 'Coś wypadło', phaseRejected: 'Limit', phaseDone: 'Koniec scenariusza',
+            chatTitle: 'Czat', chatMeta: 'to widzisz ty',
+            windowTitle: 'Okno kontekstu', windowMeta: 'to widzi model',
+            youLabel: 'ty', modelLabel: 'model', fileLabel: 'plik', chunkLabel: 'wyszukiwanie',
+            flagOut: 'poza oknem', flagSummary: 'w streszczeniu', flagIndex: 'w indeksie, poza oknem',
+            srcDoc: 'z dokumentu #{id}', srcItem: 'z wiadomości #{id}', srcChunk: 'z fragmentu z indeksu',
+            srcPartial: 'tylko znalezione fragmenty', srcSummary: 'ze streszczenia',
+            srcGuess: 'nie ma w oknie: model zgaduje', srcMissing: 'nie ma w oknie',
+            pages: 'stron', chunkText: 'Wyszukiwanie w dokumencie: 3 pasujące fragmenty.',
+            noteDrop: 'Wypadło z okna: {ids}',
+            noteDropDoc: 'Wypadło z okna: {ids}. Wśród nich jest dokument, bo był najstarszy.',
+            noteSum: 'Streszczono {ids} → {n} tok.',
+            noteReject: 'Żądanie odrzucone: potrzeba {n} tokenów, a okno mieści {cap}. Zmień strategię albo zacznij od nowa.',
+            chatEmpty: 'Kliknij „Następna tura” (N). W pierwszej turze wysyłasz dokument.',
+            blkSystem: 'instrukcje', blkTools: 'narzędzia', blkSummary: 'streszczenie', blkReserve: 'rezerwa', segReserve: 'rezerwa na odpowiedź', blkFree: 'wolne',
+            indexText: 'Poza oknem, w indeksie wyszukiwania: {file}, {n} tok. Do okna trafiają tylko znalezione fragmenty.',
+            tok: 'tok.', thousand: ' tys.', million: ' mln',
+            statRead: 'model czyta w tej turze', statTotal: 'przeczytane łącznie', statOut: 'wiadomości poza oknem',
+            summaryLead: 'Streszczenie wcześniejszej rozmowy:',
+            liveDrop: 'Wypadło z okna: {ids}', liveSum: 'Streszczono: {ids}', liveReject: 'Żądanie odrzucone: przekroczony limit okna',
+            guide1Title: 'Model nic nie pamięta',
+            guide1Body: 'Sam model nie ma pamięci między wiadomościami. W każdej turze aplikacja wysyła mu całe okno od nowa, razem z dokumentem. Przy raporcie to ponad 200 tys. tokenów za każde pytanie: patrz „przeczytane łącznie”. Pamięć podręczna (cache) obniża koszt, ale miejsca w oknie nie zwalnia.',
+            guide2Title: 'Dokument w oknie czy w indeksie',
+            guide2Body: 'Cały w oknie: model widzi każdą stronę, ale dokument zajmuje miejsce w każdej turze. RAG (wyszukiwanie): dokument leży w indeksie poza oknem, a do okna trafiają tylko fragmenty pasujące do pytania. Miejsca wystarcza na długo, ale model nie widzi całości naraz.',
+            guide3Title: 'Gdy zabraknie miejsca',
+            guide3Body: 'Usuń najstarsze: najstarszą wiadomością jest zwykle dokument, więc wypada pierwszy. Streść: dokument i starsze wiadomości zamieniają się w krótką notatkę, fakty zostają, liczby i strony znikają. Zatrzymaj: żądanie zostaje odrzucone, tak jak w API.',
+            guide4Title: 'Trzy pytania testowe',
+            guide4Body: 'Szczegół sprawdza, czy model widzi konkretną stronę. Całość sprawdza, czy widzi cały dokument naraz, i tu RAG zawodzi. Początek rozmowy sprawdza pamięć wątku. Czerwona etykieta oznacza, że informacji nie ma w oknie, a model i tak odpowiada.',
+            realTitle: 'Co robią prawdziwe aplikacje',
+            realLead: 'Stan na 28 października 2026 r. według dokumentacji OpenAI i Anthropic. Limity często się zmieniają, więc przed szkoleniem sprawdź źródła.',
+            srcLabel: 'Źródło:', srcObserved: 'Obserwacje użytkowników, nie dokumentacja:',
+            rt1Title: 'ChatGPT: rozmiar okna',
+            rt1Body: 'Okno zależy od planu i trybu. Free: 27 tys. tokenów. Go i Plus: 54 tys. w trybie Instant, 256 tys. z modelem rozumującym. Pro: 128 tys. i 400 tys. Część okna zajmują instrukcje systemowe, narzędzia, pamięć i rozumowanie, więc na tekst użytkownika zostaje mniej: w Plus Instant ok. 40 stron, w Free ok. 12.',
+            rt1Src: 'cennik ChatGPT, porównanie planów',
+            rt2Title: 'ChatGPT: duże pliki',
+            rt2Body: 'Plik tekstowy może mieć do 2 mln tokenów, czyli więcej niż jakiekolwiek okno. ChatGPT wkleja do okna tyle tekstu, ile się zmieści, licząc od początku dokumentu (w planie Enterprise do 110 tys. tokenów), a cały plik trafia do prywatnego indeksu wyszukiwania. Pytania o szczegół działają dobrze, streszczenie bardzo dużego dokumentu albo porównanie kilku dużych plików wychodzi gorzej.',
+            rt2Chip: 'w symulacji: RAG',
+            rt2Src: 'pliki w ChatGPT Enterprise', rt2Src2: 'limity plików',
+            rt3Title: 'ChatGPT: za długa rozmowa',
+            rt3Body: 'OpenAI nie opisuje tego mechanizmu w dokumentacji. Użytkownicy zgłaszają dwa objawy: model po cichu „zapomina” początek długiego wątku, a w końcu pojawia się komunikat „You\'ve reached the maximum length for this conversation” i trzeba zacząć nowy czat.',
+            rt3Chip: 'w symulacji: Usuń najstarsze, potem Zatrzymaj',
+            rt3Src: 'forum OpenAI, październik 2026',
+            rt4Title: 'Claude: długa rozmowa',
+            rt4Body: 'Okno ma od 200 tys. do 1 mln tokenów, zależnie od modelu, a część jest zarezerwowana na odpowiedź. Na płatnych planach z włączonym wykonywaniem kodu Claude przy zbliżaniu się do limitu streszcza wcześniejsze wiadomości (widać wtedy komunikat „organizing its thoughts”), a pełna historia czatu zostaje zachowana. Bardzo duża pierwsza wiadomość nadal może przekroczyć limit.',
+            rt4Chip: 'w symulacji: Streść',
+            rt4Src: 'rozmiar okna', rt4Src2: 'limity długości',
+            rt5Title: 'Claude: projekty i RAG',
+            rt5Body: 'Gdy pliki projektu zbliżają się do rozmiaru okna, Claude sam przełącza się na RAG. Zamiast wczytywać wszystko, przeszukuje wiedzę projektu narzędziem i bierze tylko pasujące fragmenty. Projekt mieści wtedy do 10 razy więcej treści. Gdy plików znów ubędzie, Claude może wrócić do wczytywania całości.',
+            rt5Chip: 'w symulacji: RAG',
+            rt5Src: 'RAG w projektach',
+            rt6Title: 'API: decyduje twórca aplikacji',
+            rt6Body: 'W API nikt nie przycina rozmowy za Ciebie. Gdy samo wejście przekracza okno, Claude zwraca błąd 400 „prompt is too long”. Gdy odpowiedź dojdzie do końca okna, urywa się z powodem model_context_window_exceeded. Przycinanie, streszczanie (kompakcja po stronie serwera, w wersji beta) albo RAG wybiera twórca aplikacji. Dokumentacja dodaje, że im więcej tokenów, tym gorsza dokładność i pamięć modelu (context rot).',
+            rt6Chip: 'w symulacji: Zatrzymaj',
+            rt6Src: 'dokumentacja Claude API, okna kontekstu',
+            scen: {
+                policy: {
+                    file: 'regulamin-pracy-zdalnej.pdf',
+                    desc: 'Regulamin pracy zdalnej: 18 stron, ok. 12 tys. tokenów, czyli niecałe 5% okna. Cała rozmowa zmieści się z dużym zapasem. Dla porównania: darmowy ChatGPT przyjmuje na wejściu ok. 12 stron, więc tam ten dokument nie zmieściłby się w całości.',
+                    u1: 'Cześć! Pracuję w HR i przygotowuję omówienie dla zarządu, więc odpowiadaj krótko, w punktach. W załączniku regulamin pracy zdalnej. Co jest w nim najważniejsze?',
+                    a1: 'Najważniejsze punkty: 1) praca zdalna całkowita lub częściowa na wniosek albo polecenie, 2) okazjonalna praca zdalna na wniosek pracownika, 3) ryczałt za prąd i internet, 4) BHP i ochrona danych, 5) kontrola pracy zdalnej.',
+                    u2: 'Kto może pracować zdalnie, a komu firma może odmówić?',
+                    a2: 'Wniosek można złożyć na każdym stanowisku, które nie wymaga obecności w biurze (§ 2). Odmowa wymaga uzasadnienia na piśmie (§ 3). Rodzicom dzieci do 4. roku życia firma może odmówić tylko wtedy, gdy praca zdalna jest niemożliwa.',
+                    u3: 'Jak wygląda zwrot kosztów prądu i internetu?',
+                    a3: 'Ryczałt 70 zł miesięcznie, wypłacany z pensją (§ 8). Maleje proporcjonalnie, gdy część miesiąca pracownik spędza w biurze. Sprzęt zapewnia firma.',
+                    u4: 'A BHP w domu?',
+                    a4: 'Pracownik składa oświadczenie, że stanowisko w domu spełnia wymogi BHP (§ 10). Firma nie kontroluje mieszkania bez zgody pracownika, a wypadek zgłasza się tak samo jak w biurze.',
+                    u5: 'Czy można pracować z zagranicy?',
+                    a5: 'Regulamin tego nie przewiduje: miejsce pracy musi być w Polsce i uzgodnione z przełożonym (§ 5). Wyjazd za granicę wymaga osobnej zgody.',
+                    u6: 'Przygotuj 5 pytań, które może zadać zarząd.',
+                    a6: '1) Ile rocznie kosztuje ryczałt? 2) Ilu osobom odmówiliśmy i dlaczego? 3) Jak kontrolujemy pracę zdalną? 4) Jak chronimy dane poza biurem? 5) Czy regulamin wymaga zmian po roku działania?',
+                    detailQ: 'Ile dni okazjonalnej pracy zdalnej przysługuje w roku?',
+                    globalQ: 'Wypisz wszystkie terminy, które pojawiają się w regulaminie.',
+                    memoryQ: 'Przypomnij: dla kogo to przygotowuję i w jakiej formie?',
+                    detail_item: '24 dni w roku kalendarzowym (§ 7 ust. 2).',
+                    detail_chunk: '24 dni w roku kalendarzowym. Znalazłem to we fragmencie z § 7.',
+                    detail_summary: 'W streszczeniu mam tylko, że regulamin opisuje pracę okazjonalną. Liczby dni tam nie ma.',
+                    detail_missing: 'Zwykle jest to 12 dni w roku.',
+                    global_item: 'Cztery terminy: 7 dni na odpowiedź na wniosek (§ 3), 3 dni na powrót do biura po cofnięciu zgody (§ 4), 14 dni na zgłoszenie zmiany miejsca pracy (§ 5), do 10. dnia miesiąca wypłata ryczałtu (§ 8).',
+                    global_partial: 'W znalezionych fragmentach są dwa terminy: 7 dni na odpowiedź na wniosek (§ 3) i wypłata ryczałtu do 10. dnia miesiąca (§ 8). Reszty dokumentu nie przeszukałem, więc lista może być niepełna.',
+                    global_summary: 'Ze streszczenia wiem, że regulamin ma terminy dla wniosków i rozliczeń, ale dokładnych terminów nie mam.',
+                    global_missing: 'Zwykle: 14 dni na odpowiedź na wniosek i 30 dni na rozliczenie kosztów.',
+                    memory_item: 'Dla zarządu, krótko i w punktach.',
+                    memory_summary: 'Dla zarządu, krótko i w punktach. Mam to w streszczeniu.',
+                    memory_missing: 'Tego nie wiem. W tej rozmowie nie widzę, dla kogo to jest.',
+                    factWho: 'omówienie dla zarządu, krótko i w punktach', factDoc: 'regulamin pracy zdalnej: wnioski, praca okazjonalna, ryczałt, BHP, kontrola',
+                },
+                report: {
+                    file: 'raport-roczny-2025-grupa-nordis.pdf',
+                    desc: 'Fikcyjny raport roczny: 420 stron, ok. 203 tys. tokenów, czyli prawie 80% okna. Razem z instrukcjami, narzędziami i rezerwą na odpowiedź zostaje miejsce tylko na dwie wymiany. W ChatGPT Plus w trybie Instant (54 tys.) ten plik nie zmieściłby się w oknie w całości.',
+                    u1: 'Dzień dobry, pracuję w dziale kredytów banku i oceniam Grupę Nordis przed decyzją kredytową. Podawaj numery stron. W załączniku raport roczny: streść go w 10 punktach.',
+                    a1: '1) Przychody +8%, 21,4 mld zł (s. 6). 2) EBITDA 4,1 mld zł (s. 7). 3) Zadłużenie netto 9,8 mld zł (s. 58). 4) Największy segment: Sieci (s. 120). ... 10) Opinia biegłego bez zastrzeżeń (s. 396).',
+                    u2: 'Jak zmieniło się zadłużenie netto rok do roku?',
+                    a2: 'Wzrosło z 8,6 do 9,8 mld zł, głównie przez inwestycje w sieci (s. 58–61). Dług netto do EBITDA: 2,4 wobec 2,2 rok wcześniej (s. 62).',
+                    u3: 'Które ryzyka zarząd uważa za najważniejsze?',
+                    a3: 'Trzy kluczowe: ceny uprawnień do emisji CO2, ryzyko regulacyjne taryf i stopy procentowe (s. 94–103). Ryzyko walutowe zarząd ocenia jako umiarkowane (s. 97).',
+                    u4: 'Porównaj marże segmentów Energia i Sieci.',
+                    a4: 'Marża EBITDA w Sieciach: 41% (s. 132), w Energii: 14% (s. 118). Sieci dają stabilny, regulowany wynik, Energia zależy od cen hurtowych.',
+                    u5: 'Co napisał biegły rewident?',
+                    a5: 'Opinia bez zastrzeżeń, ze zwróceniem uwagi na spór podatkowy o 310 mln zł (s. 396–399).',
+                    u6: 'Czy są istotne spory sądowe?',
+                    a6: 'Dwa: spór podatkowy o 310 mln zł (nota 41, s. 371) i roszczenie wykonawcy farmy wiatrowej na 95 mln zł (s. 373). Rezerwę utworzono tylko na drugi.',
+                    u7: 'Przygotuj notatkę kredytową na jedną stronę.',
+                    a7: 'Notatka: stabilny segment Sieci, rosnące zadłużenie (2,4 x EBITDA), kluczowe ryzyka: CO2, taryfy, stopy. Rekomendacja: kredyt z kowenantem dług netto do EBITDA poniżej 3,0.',
+                    detailQ: 'Ile wyniosły nakłady inwestycyjne segmentu Sieci w 2025 r.?',
+                    globalQ: 'W ilu miejscach raport pisze o ryzyku walutowym i czy ocena jest wszędzie taka sama?',
+                    memoryQ: 'Przypomnij, pod kątem jakiej decyzji analizuję ten raport?',
+                    detail_item: '4,82 mld zł (s. 214, nota 31).',
+                    detail_chunk: '4,82 mld zł. Znalazłem to we fragmencie ze s. 214.',
+                    detail_summary: 'W streszczeniu mam tylko, że inwestycje w Sieciach rosły. Dokładnej kwoty tam nie ma.',
+                    detail_missing: 'Około 3,5 mld zł.',
+                    global_item: 'W sześciu miejscach (s. 12, 48, 97, 203, 288, 371). Ocena nie jest spójna: w liście prezesa i w opisie ryzyk ryzyko jest „umiarkowane”, ale w nocie 38 (s. 288) zarząd nazywa je „istotnym” po spadku kursu złotego w IV kwartale.',
+                    global_partial: 'Znalazłem trzy fragmenty (s. 48, 97, 203) i we wszystkich ryzyko walutowe jest „umiarkowane”. Nie przeszukałem całego raportu, więc mogłem pominąć inne miejsca.',
+                    global_summary: 'Ze streszczenia wiem tylko, że ryzyko walutowe jest wśród ryzyk finansowych. Nie umiem policzyć wzmianek ani porównać ocen.',
+                    global_missing: 'Ryzyko walutowe opisano w części o ryzykach finansowych, ocena jest umiarkowana.',
+                    memory_item: 'Pod kątem decyzji kredytowej banku. Była też prośba o numery stron.',
+                    memory_summary: 'Pod kątem decyzji kredytowej banku, z numerami stron. Mam to w streszczeniu.',
+                    memory_missing: 'Tego nie wiem. W tej rozmowie nie widzę, do czego służy analiza.',
+                    factWho: 'ocena przed decyzją kredytową banku, z numerami stron', factDoc: 'raport roczny Grupy Nordis: wzrost przychodów, rosnące zadłużenie, ryzyka CO2, taryf i stóp, opinia bez zastrzeżeń',
+                },
+            },
+        },
+        en: {
+            navGen: 'Generation', navCtx: 'Context window',
+            docTitle: 'How the context window works · edulab',
+            title: 'How the context window works',
+            budgetTitle: 'Context is a budget',
+            budgetText: 'Everything the model conditions on has to fit in one window: the standing instructions, the tool definitions, the conversation, and every file it reads. Drag the slider to the right.',
+            scaleMax: '1 million tokens, the whole window',
+            sessionLabel: 'Session length',
+            sessionValue: '{m} messages, {f} files read',
+            usedPct: '{p}% used',
+            overBy: '{p}%: {n} tokens don\'t fit',
+            segSystem: 'instructions', segTools: 'tools', segConv: 'conversation', segFiles: 'files', segFree: 'free',
+            segDoc: 'document', segChunks: 'passages (RAG)',
+            simTitle: 'A conversation about a document',
+            simLead: 'The window holds 256k tokens, as in ChatGPT Plus with a reasoning model. Instructions and tools take 16k, and 32k stays free for the reply and its reasoning. The reasoning never shows in the chat, but it stays in the window and counts toward the limit. Pick a scenario, play the conversation and ask the test questions.',
+            controlsTitle: 'Conversation', turnLabel: 'Turn',
+            scenLabel: 'Scenario', scenPolicy: '1: policy', scenReport: '2: annual report',
+            nextTurn: 'Next turn', reset: 'Reset',
+            askLabel: 'Ask', askDetail: 'a detail', askGlobal: 'the whole', askMemory: 'the start',
+            docModeLabel: 'Document', modeFull: 'Whole in window', modeRag: 'RAG',
+            strategyLabel: 'When full',
+            stDrop: 'Drop oldest', stSum: 'Summarize', stStop: 'Stop',
+            phaseReady: 'Ready', phaseFits: 'Fits', phaseTrimmed: 'Something left', phaseRejected: 'Limit hit', phaseDone: 'End of script',
+            chatTitle: 'Chat', chatMeta: 'what you see',
+            windowTitle: 'Context window', windowMeta: 'what the model sees',
+            youLabel: 'you', modelLabel: 'model', fileLabel: 'file', chunkLabel: 'search',
+            flagOut: 'outside the window', flagSummary: 'in the summary', flagIndex: 'in the index, outside the window',
+            srcDoc: 'from document #{id}', srcItem: 'from message #{id}', srcChunk: 'from a retrieved passage',
+            srcPartial: 'retrieved passages only', srcSummary: 'from the summary',
+            srcGuess: 'not in the window: the model guesses', srcMissing: 'not in the window',
+            pages: 'pages', chunkText: 'Document search: 3 matching passages.',
+            noteDrop: 'Dropped from the window: {ids}',
+            noteDropDoc: 'Dropped from the window: {ids}. The document is among them, because it was the oldest.',
+            noteSum: 'Summarized {ids} → {n} tok',
+            noteReject: 'Request rejected: {n} tokens needed, the window holds {cap}. Switch the strategy or reset.',
+            chatEmpty: 'Press Next turn (N). The first turn sends the document.',
+            blkSystem: 'instructions', blkTools: 'tools', blkSummary: 'summary', blkReserve: 'reserve', segReserve: 'reply reserve', blkFree: 'free',
+            indexText: 'Outside the window, in a search index: {file}, {n} tok. Only retrieved passages enter the window.',
+            tok: 'tok', thousand: 'k', million: 'M',
+            statRead: 'read on this turn', statTotal: 'read in total', statOut: 'messages outside the window',
+            summaryLead: 'Summary of the earlier conversation:',
+            liveDrop: 'Dropped from the window: {ids}', liveSum: 'Summarized: {ids}', liveReject: 'Request rejected: window limit exceeded',
+            guide1Title: 'No memory between turns',
+            guide1Body: 'The model itself remembers nothing. On every turn the app sends the whole window again, document included. With the annual report that is over 200k tokens per question: watch "read in total". Prompt caching lowers the cost but frees no room in the window.',
+            guide2Title: 'Document in the window or in an index',
+            guide2Body: 'Whole in the window: the model sees every page, but the document takes up room on every turn. RAG (search): the document sits in an index outside the window, and only passages matching the question come in. Room lasts much longer, but the model never sees the whole thing at once.',
+            guide3Title: 'When it runs out',
+            guide3Body: 'Drop oldest: the oldest message is usually the document, so it goes first. Summarize: the document and older messages become a short note that keeps the facts but loses numbers and page references. Stop: the request is rejected, as in the API.',
+            guide4Title: 'Three test questions',
+            guide4Body: 'The detail question checks whether the model sees a specific page. The whole-document question checks whether it sees everything at once, and that is where RAG falls short. The start question checks memory of the thread. A red label means the information is not in the window, yet the model answers anyway.',
+            realTitle: 'What real apps do',
+            realLead: 'As of 28 October 2026, from OpenAI and Anthropic documentation. Limits change often, so check the sources before teaching.',
+            srcLabel: 'Source:', srcObserved: 'User reports, not documentation:',
+            rt1Title: 'ChatGPT: window size',
+            rt1Body: 'The window depends on the plan and mode. Free: 27k tokens. Go and Plus: 54k in Instant mode, 256k with a reasoning model. Pro: 128k and 400k. System instructions, tools, memory and reasoning take part of it, so less is left for user text: about 40 pages in Plus Instant, about 12 in Free.',
+            rt1Src: 'ChatGPT pricing, plan comparison',
+            rt2Title: 'ChatGPT: large files',
+            rt2Body: 'A text file can hold up to 2M tokens, more than any window. ChatGPT puts as much text as fits into the window, starting from the beginning of the document (up to 110k tokens on Enterprise), and the whole file goes into a private search index. Detail questions work well; summarizing a very large document or comparing several large files works less well.',
+            rt2Chip: 'in the simulation: RAG',
+            rt2Src: 'file uploads in ChatGPT Enterprise', rt2Src2: 'file limits',
+            rt3Title: 'ChatGPT: a conversation too long',
+            rt3Body: 'OpenAI does not document this mechanism. Users report two symptoms: the model quietly "forgets" the start of a long thread, and eventually the message "You\'ve reached the maximum length for this conversation" appears and a new chat is needed.',
+            rt3Chip: 'in the simulation: Drop oldest, then Stop',
+            rt3Src: 'OpenAI forum, October 2026',
+            rt4Title: 'Claude: a long conversation',
+            rt4Body: 'The window holds 200k to 1M tokens depending on the model, and part of it is reserved for the reply. On paid plans with code execution enabled, Claude summarizes earlier messages as the limit approaches (it shows "organizing its thoughts") and the full chat history is kept. A very large first message can still exceed the limit.',
+            rt4Chip: 'in the simulation: Summarize',
+            rt4Src: 'window size', rt4Src2: 'length limits',
+            rt5Title: 'Claude: projects and RAG',
+            rt5Body: 'When project files approach the window size, Claude switches to RAG on its own. Instead of loading everything, it searches the project knowledge with a tool and takes only the matching passages. A project then holds up to 10 times more content. If files are removed, Claude can go back to loading everything.',
+            rt5Chip: 'in the simulation: RAG',
+            rt5Src: 'RAG for projects',
+            rt6Title: 'API: the app builder decides',
+            rt6Body: 'In the API nothing trims the conversation for you. If the input alone exceeds the window, Claude returns a 400 error, "prompt is too long". If the reply reaches the end of the window, it stops with model_context_window_exceeded. Trimming, summarizing (server-side compaction, in beta) or RAG is the app builder\'s choice. The documentation adds that accuracy and recall drop as the token count grows (context rot).',
+            rt6Chip: 'in the simulation: Stop',
+            rt6Src: 'Claude API docs, context windows',
+            scen: {
+                policy: {
+                    file: 'remote-work-policy.pdf',
+                    desc: 'A remote work policy: 18 pages, about 12k tokens, under 5% of the window. The whole conversation fits with lots of room to spare. For comparison: free ChatGPT accepts about 12 pages of input, so this document would not fit there in full.',
+                    u1: 'Hi! I work in HR and I\'m preparing a briefing for the board, so keep answers short and in bullet points. Attached is our remote work policy. What matters most in it?',
+                    a1: 'Key points: 1) full or partial remote work on request or on instruction, 2) occasional remote work on the employee\'s request, 3) a flat allowance for power and internet, 4) health and safety and data protection, 5) checks on remote work.',
+                    u2: 'Who can work remotely, and when can the company refuse?',
+                    a2: 'Any role that does not require office presence can apply (§ 2). A refusal must be justified in writing (§ 3). Parents of children under 4 can be refused only if remote work is impossible.',
+                    u3: 'How are power and internet costs covered?',
+                    a3: 'A flat 70 PLN a month, paid with the salary (§ 8). It drops proportionally when part of the month is spent in the office. The company provides the equipment.',
+                    u4: 'And health and safety at home?',
+                    a4: 'The employee declares that the home workstation meets safety rules (§ 10). The company does not inspect the home without consent, and accidents are reported as in the office.',
+                    u5: 'Can people work from abroad?',
+                    a5: 'The policy does not allow it: the place of work must be in Poland and agreed with the manager (§ 5). Working abroad needs separate approval.',
+                    u6: 'Draft 5 questions the board might ask.',
+                    a6: '1) What does the allowance cost per year? 2) How many requests did we refuse, and why? 3) How do we check remote work? 4) How do we protect data outside the office? 5) Does the policy need changes after a year?',
+                    detailQ: 'How many days of occasional remote work are allowed per year?',
+                    globalQ: 'List every deadline that appears in the policy.',
+                    memoryQ: 'Remind me: who is this for, and in what format?',
+                    detail_item: '24 days per calendar year (§ 7(2)).',
+                    detail_chunk: '24 days per calendar year. I found it in a passage from § 7.',
+                    detail_summary: 'My summary only says the policy covers occasional remote work. The number of days is not in it.',
+                    detail_missing: 'Usually 12 days a year.',
+                    global_item: 'Four deadlines: 7 days to answer a request (§ 3), 3 days to return to the office after consent is withdrawn (§ 4), 14 days to report a change of work location (§ 5), the allowance paid by the 10th of the month (§ 8).',
+                    global_partial: 'The retrieved passages contain two deadlines: 7 days to answer a request (§ 3) and the allowance paid by the 10th of the month (§ 8). I did not search the rest of the document, so the list may be incomplete.',
+                    global_summary: 'From the summary I know the policy sets deadlines for requests and payments, but I don\'t have the exact ones.',
+                    global_missing: 'Typically 14 days to answer a request and 30 days to settle costs.',
+                    memory_item: 'For the board, short and in bullet points.',
+                    memory_summary: 'For the board, short and in bullet points. It\'s in my summary.',
+                    memory_missing: 'I don\'t know. I can\'t see in this conversation who it is for.',
+                    factWho: 'a briefing for the board, short, in bullet points', factDoc: 'remote work policy: requests, occasional remote work, allowance, safety, checks',
+                },
+                report: {
+                    file: 'annual-report-2025-nordis-group.pdf',
+                    desc: 'A fictional annual report: 420 pages, about 203k tokens, almost 80% of the window. With instructions, tools and the reply reserve there is room for only two exchanges. In ChatGPT Plus Instant mode (54k) this file would not fit in the window in full.',
+                    u1: 'Hello, I work in a bank\'s credit department and I\'m assessing Nordis Group before a lending decision. Give page numbers. Attached is the annual report: summarize it in 10 points.',
+                    a1: '1) Revenue +8%, PLN 21.4bn (p. 6). 2) EBITDA PLN 4.1bn (p. 7). 3) Net debt PLN 9.8bn (p. 58). 4) Largest segment: Networks (p. 120). ... 10) Clean audit opinion (p. 396).',
+                    u2: 'How did net debt change year on year?',
+                    a2: 'It rose from PLN 8.6bn to 9.8bn, mainly due to network investment (pp. 58–61). Net debt to EBITDA: 2.4 versus 2.2 a year earlier (p. 62).',
+                    u3: 'Which risks does the board consider most important?',
+                    a3: 'Three key ones: CO2 allowance prices, tariff regulation and interest rates (pp. 94–103). Currency risk is rated moderate (p. 97).',
+                    u4: 'Compare the margins of the Energy and Networks segments.',
+                    a4: 'EBITDA margin in Networks: 41% (p. 132), in Energy: 14% (p. 118). Networks give a stable, regulated result; Energy depends on wholesale prices.',
+                    u5: 'What did the auditor say?',
+                    a5: 'A clean opinion, with an emphasis of matter on a PLN 310m tax dispute (pp. 396–399).',
+                    u6: 'Are there significant legal disputes?',
+                    a6: 'Two: the PLN 310m tax dispute (note 41, p. 371) and a wind farm contractor\'s PLN 95m claim (p. 373). A provision was made only for the second.',
+                    u7: 'Write a one-page credit memo.',
+                    a7: 'Memo: a stable Networks segment, rising debt (2.4x EBITDA), key risks: CO2, tariffs, rates. Recommendation: lend with a net debt to EBITDA covenant below 3.0.',
+                    detailQ: 'What was capital expenditure in the Networks segment in 2025?',
+                    globalQ: 'In how many places does the report discuss currency risk, and is the assessment the same everywhere?',
+                    memoryQ: 'Remind me: what decision am I analysing this report for?',
+                    detail_item: 'PLN 4.82bn (p. 214, note 31).',
+                    detail_chunk: 'PLN 4.82bn. I found it in a passage from p. 214.',
+                    detail_summary: 'My summary only says Networks investment grew. The exact amount is not in it.',
+                    detail_missing: 'About PLN 3.5bn.',
+                    global_item: 'In six places (pp. 12, 48, 97, 203, 288, 371). The assessment is not consistent: the CEO letter and the risk section call it "moderate", but note 38 (p. 288) calls it "significant" after the zloty fell in Q4.',
+                    global_partial: 'I found three passages (pp. 48, 97, 203), and all of them rate currency risk as "moderate". I did not search the whole report, so I may have missed other places.',
+                    global_summary: 'From the summary I only know currency risk is among the financial risks. I can\'t count the mentions or compare the assessments.',
+                    global_missing: 'Currency risk is covered in the financial risks section and rated moderate.',
+                    memory_item: 'A bank lending decision. You also asked for page numbers.',
+                    memory_summary: 'A bank lending decision, with page numbers. It\'s in my summary.',
+                    memory_missing: 'I don\'t know. I can\'t see in this conversation what the analysis is for.',
+                    factWho: 'assessment before a bank lending decision, with page numbers', factDoc: 'Nordis Group annual report: revenue growth, rising debt, CO2, tariff and rate risks, clean audit opinion',
+                },
+            },
+        },
+    };
+
+    // ─── State ────────────────────────────────────────────────────────────────
+    let lang = 'en';
+    const sim = {
+        scenario: 'policy',
+        docMode: 'full',     // full | rag
+        strategy: 'drop',
+        items: [],           // { id, kind: user|model|file|chunk|note, key, tokens, state: in|out|summary|index, ... }
+        nextId: 1,
+        turn: 0,
+        summary: null,       // { facts: Set, tokens, ids: [] }
+        phase: 'ready',
+        lastRead: 0,
+        totalRead: 0,
+        freshIds: new Set(),
+    };
+
+    // ─── DOM refs ─────────────────────────────────────────────────────────────
+    const budgetCard    = document.getElementById('budget');
+    const budgetBar     = document.getElementById('budgetBar');
+    const budgetPct     = document.getElementById('budgetPct');
+    const sessionSlider = document.getElementById('sessionSlider');
+    const sessionValue  = document.getElementById('sessionValue');
+    const simRoot       = document.getElementById('sim');
+    const transcript    = document.getElementById('transcript');
+    const windowBox     = document.getElementById('windowBox');
+    const indexBox      = document.getElementById('indexBox');
+    const meterUsed     = document.getElementById('meterUsed');
+    const meterCap      = document.getElementById('meterCap');
+    const phaseChip     = document.getElementById('phaseChip');
+    const turnCount     = document.getElementById('turnCount');
+    const controlsCard  = document.getElementById('controlsCard');
+    const simGrid       = document.getElementById('simGrid');
+    const pageHeader    = document.querySelector('.edu-header');
+    const nextBtn       = document.getElementById('nextBtn');
+    const resetBtn      = document.getElementById('resetBtn');
+    const statRead      = document.getElementById('statRead');
+    const statTotal     = document.getElementById('statTotal');
+    const statOut       = document.getElementById('statOut');
+    const live          = document.getElementById('live');
+
+    // ─── Helpers ──────────────────────────────────────────────────────────────
+    const t    = key => (T[lang] && T[lang][key]) ?? T.en[key] ?? key;
+    const sc   = key => T[lang].scen[sim.scenario][key] ?? T.en.scen[sim.scenario][key] ?? key;
+    const fill = (str, vars) => str.replace(/\{(\w+)\}/g, (_, k) => vars[k]);
+    const fmt  = n => Math.round(n).toLocaleString(lang === 'pl' ? 'pl-PL' : 'en-US');
+    const fmtK = n => n >= 1e6 ? (n / 1e6).toLocaleString(lang === 'pl' ? 'pl-PL' : 'en-US', { maximumFractionDigits: 2 }) + t('million')
+                    : n >= 1000 ? fmt(n / 1000) + t('thousand') : fmt(n);
+    const idList = ids => ids.map(id => '#' + id).join(', ');
+    const scenario = () => SCENARIOS[sim.scenario];
+
+    function el(tag, cls, text) {
+        const node = document.createElement(tag);
+        if (cls) node.className = cls;
+        if (text != null) node.textContent = text;
+        return node;
+    }
+
+    function announce(msg) { live.textContent = msg; }
+
+    // Budget numbers for a slider position
+    function budgetAt(step) {
+        const conv  = step * CONV_PER_STEP;
+        const files = Math.floor(step / FILE_EVERY) * FILE_TOKENS;
+        return { system: BUDGET_SYSTEM, tools: BUDGET_TOOLS, conv, files,
+                 nFiles: Math.floor(step / FILE_EVERY), nMsgs: Math.round(step * MSGS_PER_STEP) };
+    }
+
+    // ─── Simulation model ─────────────────────────────────────────────────────
+    const inWindow   = () => sim.items.filter(it => it.kind !== 'note' && it.state === 'in');
+    const pinned     = () => SYSTEM_TOKENS + TOOLS_TOKENS;
+    const usedTokens = () => pinned() + (sim.summary ? sim.summary.tokens : 0)
+                            + inWindow().reduce((a, it) => a + it.tokens, 0);
+    const docItem    = () => sim.items.find(it => it.kind === 'file');
+    const firstUser  = () => sim.items.find(it => it.kind === 'user');
+
+    function addItem(fields) {
+        const item = { id: null, state: 'in', ...fields };
+        if (item.kind !== 'note') item.id = sim.nextId++;
+        sim.items.push(item);
+        sim.freshIds.add(item);
+        return item;
+    }
+
+    function dropOldest(over) {
+        const dropped = [];
+        for (const it of inWindow()) {
+            if (over <= 0) break;
+            it.state = 'out'; over -= it.tokens; dropped.push(it);
+        }
+        return dropped;
+    }
+
+    // Compress everything but the latest exchange into one summary block
+    function summarize() {
+        const raw = inWindow();
+        const victims = raw.slice(0, Math.max(0, raw.length - KEEP_RAW));
+        if (!victims.length) return [];
+        const facts = new Set(sim.summary ? sim.summary.facts : []);
+        victims.forEach(it => { it.state = 'summary'; (it.facts || []).forEach(f => facts.add(f)); });
+        const ids = (sim.summary ? sim.summary.ids : []).concat(victims.map(it => it.id));
+        sim.summary = { facts, ids, tokens: SUMMARY_BASE + SUMMARY_PER_FACT * facts.size };
+        return victims.map(it => it.id);
+    }
+
+    // Before a model call: room for the incoming message(s) plus the reply reserve
+    function makeRoom(incoming) {
+        const need = () => usedTokens() + incoming + RESERVE_TOKENS - CAPACITY;
+        if (need() <= 0) return { ok: true, trimmed: false };
+        if (sim.strategy === 'stop') {
+            const last = sim.items[sim.items.length - 1];
+            if (last && last.key === 'noteReject') return { ok: false };   // one note per refusal streak
+            addItem({ kind: 'note', key: 'noteReject', vars: { n: usedTokens() + incoming + RESERVE_TOKENS } });
+            announce(t('liveReject'));
+            return { ok: false };
+        }
+        if (sim.strategy === 'summary') {
+            const ids = summarize();
+            if (ids.length) {
+                addItem({ kind: 'note', key: 'noteSum', ids, vars: { n: sim.summary.tokens } });
+                announce(fill(t('liveSum'), { ids: idList(ids) }));
+            }
+        }
+        if (need() > 0) {
+            const dropped = dropOldest(need());
+            const ids = dropped.map(it => it.id);
+            const key = dropped.some(it => it.kind === 'file') ? 'noteDropDoc' : 'noteDrop';
+            addItem({ kind: 'note', key, ids });
+            announce(fill(t('liveDrop'), { ids: idList(ids) }));
+        }
+        return { ok: true, trimmed: true };
+    }
+
+    // One model call: the model reads the whole window, then its reply joins it.
+    // In RAG mode a search first pulls matching passages into the window.
+    function callModel(replyFields, search) {
+        if (search && sim.docMode === 'rag') addItem({ kind: 'chunk', tokens: RAG_TOKENS });
+        sim.lastRead = usedTokens();
+        sim.totalRead += sim.lastRead;
+        return addItem({ kind: 'model', ...replyFields });
+    }
+
+    const afterCall = room => setPhase(sim.turn >= scenario().turns.length ? 'done' : room.trimmed ? 'trimmed' : 'fits');
+
+    function nextTurn() {
+        const turns = scenario().turns;
+        if (sim.turn >= turns.length) return;
+        const step = turns[sim.turn];
+        const doc = scenario().doc;
+        const docInWindow = step.withDoc && sim.docMode === 'full';
+        const search = sim.docMode === 'rag' && (step.withDoc || sim.turn > 0);
+        const incoming = step.ut + (docInWindow ? doc.tokens : 0) + (search ? RAG_TOKENS : 0);
+        const room = makeRoom(incoming);
+        if (!room.ok) { setPhase('rejected'); return render(); }
+        const n = sim.turn + 1;
+        addItem({ kind: 'user', key: 'u' + n, tokens: step.ut, facts: step.facts });
+        if (step.withDoc) addItem({ kind: 'file', tokens: doc.tokens, facts: ['doc'], state: docInWindow ? 'in' : 'index' });
+        callModel({ key: 'a' + n, tokens: step.rt + step.think, visible: step.rt }, search);
+        sim.turn++;
+        afterCall(room);
+        render();
+    }
+
+    // Where the answer to a test question can come from, given the window now
+    function probeSource(which) {
+        const doc = docItem();
+        const has = f => sim.summary && sim.summary.facts.has(f);
+        if (which === 'memory') {
+            const u = firstUser();
+            if (u && u.state === 'in') return { source: 'item', sourceId: u.id };
+            return { source: has('who') ? 'summary' : 'missing' };
+        }
+        if (doc && doc.state === 'in') return { source: 'item', sourceId: doc.id, fromDoc: true };
+        if (doc && doc.state === 'index') return { source: which === 'detail' ? 'chunk' : 'partial' };
+        return { source: has('doc') ? 'summary' : 'missing' };
+    }
+
+    // A test question: the answer depends only on what is still in the window
+    function ask(which) {
+        if (!docItem()) return;                       // nothing to ask about before turn 1
+        const p = PROBES[which];
+        const search = p.search && sim.docMode === 'rag';
+        const room = makeRoom(p.qt + (search ? RAG_TOKENS : 0));
+        if (!room.ok) { setPhase('rejected'); return render(); }
+        addItem({ kind: 'user', key: which + 'Q', tokens: p.qt });
+        const src = probeSource(which);
+        callModel({ key: `${which}_${src.source === 'item' ? 'item' : src.source}`, tokens: p.at + p.think, visible: p.at, probe: which, ...src }, search);
+        afterCall(room);
+        render();
+    }
+
+    function setStrategy(st) {
+        sim.strategy = st;
+        if (sim.phase === 'rejected') setPhase(sim.turn ? 'fits' : 'ready');
+        render();
+    }
+
+    // Changing the scenario or how the document is loaded starts the chat over
+    function setScenario(key) { sim.scenario = key; resetSim(); }
+    function setDocMode(mode) { sim.docMode = mode; resetSim(); }
+
+    function setPhase(p) { sim.phase = p; }
+
+    function resetSim() {
+        Object.assign(sim, { items: [], nextId: 1, turn: 0, summary: null, phase: 'ready',
+                             lastRead: 0, totalRead: 0, freshIds: new Set() });
+        render();
+    }
+
+    // ─── Render: budget ───────────────────────────────────────────────────────
+    function renderBudget() {
+        const b = budgetAt(+sessionSlider.value);
+        const used = b.system + b.tools + b.conv + b.files;
+        const pct = used / BUDGET_CAP * 100;
+        const over = used > BUDGET_CAP;
+
+        let left = 0;      // segments clip at the window's edge
+        budgetBar.querySelectorAll('.seg').forEach(seg => {
+            const w = Math.max(0, Math.min(b[seg.dataset.seg] / BUDGET_CAP * 100, 100 - left));
+            seg.style.width = w + '%';
+            left += w;
+        });
+        budgetBar.classList.toggle('over', over);
+
+        budgetPct.textContent = over
+            ? fill(t('overBy'), { p: Math.round(pct), n: fmtK(used - BUDGET_CAP) })
+            : fill(t('usedPct'), { p: Math.round(pct) });
+        budgetPct.classList.toggle('over', over);
+        budgetPct.style.left = Math.min(Math.max(Math.min(pct, 100) / 2, 9), 85) + '%';
+        budgetBar.setAttribute('aria-label', budgetPct.textContent);
+
+        sessionValue.textContent = fill(t('sessionValue'), { m: b.nMsgs, f: b.nFiles });
+        const counts = { ...b, free: Math.max(0, BUDGET_CAP - used) };
+        budgetCard.querySelectorAll('[data-count]').forEach(n => { n.textContent = fmtK(counts[n.dataset.count]); });
+
+        budgetCard.dataset.used = used;
+        budgetCard.dataset.usedPct = Math.round(pct);
+        budgetCard.dataset.overflow = over;
+    }
+
+    // ─── Render: simulation ───────────────────────────────────────────────────
+    function itemLabel(it) {
+        return { user: t('youLabel'), file: t('fileLabel'), chunk: t('chunkLabel') }[it.kind] || t('modelLabel');
+    }
+
+    function sourceFlag(it) {
+        const guessy = it.probe !== 'memory';
+        const map = {
+            item:    ['flag-in',      fill(t(it.fromDoc ? 'srcDoc' : 'srcItem'), { id: it.sourceId })],
+            chunk:   ['flag-in',      t('srcChunk')],
+            partial: ['flag-partial', t('srcPartial')],
+            summary: ['flag-summary', t('srcSummary')],
+            missing: ['flag-missing', t(guessy ? 'srcGuess' : 'srcMissing')],
+        };
+        const [cls, txt] = map[it.source];
+        return el('span', 'flag ' + cls, txt);
+    }
+
+    function messageText(it) {
+        if (it.kind === 'file')  return `${sc('file')} · ${scenario().doc.pages} ${t('pages')}`;
+        if (it.kind === 'chunk') return t('chunkText');
+        return sc(it.key);
+    }
+
+    function renderMessage(it) {
+        const box = el('div', `msg msg-${it.kind}`);
+        if (it.kind === 'chunk') box.classList.add('k-chunk');
+        box.dataset.state = it.state;
+        box.dataset.id = it.id;
+        const meta = el('div', 'msg-meta');
+        meta.append(el('span', null, `#${it.id} ${itemLabel(it)} · ${fmt(it.visible ?? it.tokens)} ${t('tok')}`));   // visible text only
+        const stateFlag = { out: ['flag-out', 'flagOut'], summary: ['flag-summary', 'flagSummary'], index: ['flag-out', 'flagIndex'] }[it.state];
+        if (stateFlag) meta.append(el('span', 'flag ' + stateFlag[0], t(stateFlag[1])));
+        if (it.source) meta.append(sourceFlag(it));
+        box.append(meta, el('div', null, messageText(it)));
+        return box;
+    }
+
+    function renderNote(it) {
+        const kind = { noteDrop: 'drop', noteDropDoc: 'drop', noteSum: 'summary', noteReject: 'reject' }[it.key];
+        const box = el('div', 'note note-' + kind);
+        const n = it.vars && it.vars.n != null ? fmt(it.vars.n) : '';
+        box.append(el('span', null, fill(t(it.key), { ids: idList(it.ids || []), cap: fmt(CAPACITY), n })));
+        if (kind === 'summary') box.append(el('span', null, summaryText()));
+        return box;
+    }
+
+    function summaryText() {
+        if (!sim.summary) return '';
+        const parts = ['who', 'doc'].filter(f => sim.summary.facts.has(f))
+            .map(f => sc('fact' + f[0].toUpperCase() + f.slice(1)));
+        return `${t('summaryLead')} ${parts.join('; ')}.`;
+    }
+
+    function renderTranscript() {
+        transcript.innerHTML = '';
+        transcript.append(el('div', 'note note-scen', sc('desc')));    // what this scenario is about
+        if (!sim.items.length) { transcript.append(el('p', 'empty-hint', t('chatEmpty'))); return; }
+        sim.items.forEach(it => {
+            const node = it.kind === 'note' ? renderNote(it) : renderMessage(it);
+            if (sim.freshIds.has(it)) node.classList.add('fade-in');
+            transcript.append(node);
+        });
+        transcript.scrollTop = transcript.scrollHeight;
+    }
+
+    function block(cls, label, tokens, px, title, fresh) {
+        const b = el('div', 'blk ' + cls);
+        b.style.height = Math.max(MIN_BLOCK_PX, px) + 'px';
+        b.title = title || `${label} · ${fmt(tokens)} ${t('tok')}`;
+        if (px >= LABEL_MIN_PX) { b.append(el('span', null, label), el('span', 'n', fmtK(tokens))); }
+        if (fresh) b.classList.add('fresh');
+        return b;
+    }
+
+    function renderWindow() {
+        const h = windowBox.clientHeight || 460;
+        const px = tok => tok / CAPACITY * h;
+        const counts = { system: SYSTEM_TOKENS, tools: TOOLS_TOKENS, doc: 0, chunks: 0, user: 0, model: 0,
+                         summary: sim.summary ? sim.summary.tokens : 0 };
+        windowBox.innerHTML = '';
+        windowBox.append(block('k-system', t('blkSystem'), SYSTEM_TOKENS, px(SYSTEM_TOKENS)));
+        windowBox.append(block('k-tools', t('blkTools'), TOOLS_TOKENS, px(TOOLS_TOKENS)));
+        if (sim.summary) windowBox.append(block('k-summary', t('blkSummary'), sim.summary.tokens, px(sim.summary.tokens), summaryText()));
+        inWindow().forEach(it => {
+            const cls = { user: 'k-user', model: 'k-model', file: 'k-file', chunk: 'k-chunk' }[it.kind];
+            counts[{ file: 'doc', chunk: 'chunks' }[it.kind] || it.kind] += it.tokens;
+            const label = it.kind === 'file' ? `#${it.id} ${t('segDoc')}` : `#${it.id} ${itemLabel(it)}`;
+            windowBox.append(block(cls, label, it.tokens, px(it.tokens),
+                `${label} · ${fmt(it.tokens)} ${t('tok')}`, sim.freshIds.has(it)));
+        });
+        const used = usedTokens();
+        const reserve = Math.max(0, Math.min(RESERVE_TOKENS, CAPACITY - used));
+        if (reserve > 0) windowBox.append(block('k-reserve', t('blkReserve'), reserve, px(reserve)));
+        const free = Math.max(0, CAPACITY - used - reserve);
+        windowBox.append(el('div', 'blk k-free', px(free) >= LABEL_MIN_PX ? `${t('blkFree')} · ${fmtK(free)}` : ''));
+        Object.assign(counts, { reserve, free });
+
+        windowBox.classList.toggle('over', sim.phase === 'rejected');
+        meterUsed.textContent = fmt(used);
+        meterCap.textContent = `${fmt(CAPACITY)} ${t('tok')} · ${Math.round(used / CAPACITY * 100)}%`;
+        windowBox.setAttribute('aria-label', `${t('windowMeta')}: ${fmt(used)} / ${fmt(CAPACITY)} ${t('tok')}`);
+        document.querySelectorAll('[data-wcount]').forEach(n => { n.textContent = fmtK(counts[n.dataset.wcount]); });
+
+        const doc = docItem();
+        indexBox.hidden = !(doc && doc.state === 'index');
+        if (!indexBox.hidden) indexBox.textContent = fill(t('indexText'), { file: sc('file'), n: fmtK(doc.tokens) });
+    }
+
+    // Size the chat and the window bar so the controls, chat and window fit one
+    // screen (desktop only; phones stack and scroll). The header hides while
+    // scrolling down to the simulator, so it does not count against the height.
+    function fitSimHeight() {
+        if (window.matchMedia('(max-width: 768px)').matches) { simRoot.style.removeProperty('--sim-h'); return; }
+        const span  = simGrid.getBoundingClientRect().bottom - controlsCard.getBoundingClientRect().top;
+        const fixed = span - windowBox.offsetHeight;          // everything around the stretchy bar
+        const avail = window.innerHeight - FIT_MARGIN * 2;
+        const h = Math.round(Math.max(SIM_MIN_H, Math.min(SIM_MAX_H, avail - fixed)));
+        simRoot.style.setProperty('--sim-h', h + 'px');
+        simRoot.dataset.fitsViewport = fixed + h <= avail;
+    }
+
+    function render() {
+        fitSimHeight();
+        renderTranscript();
+        renderWindow();
+
+        phaseChip.textContent = t(PHASES[sim.phase]);
+        turnCount.textContent = `${sim.turn}/${scenario().turns.length}`;
+        nextBtn.disabled = sim.turn >= scenario().turns.length;
+        document.querySelectorAll('.probe-btn').forEach(b => {
+            b.disabled = !docItem();
+            b.title = sc(b.dataset.probe + 'Q');
+        });
+        [['scenario', sim.scenario], ['docMode', sim.docMode], ['strategy', sim.strategy]].forEach(([attr, val]) => {
+            document.querySelectorAll(`.opt-btn[data-${attr.replace(/[A-Z]/, c => '-' + c.toLowerCase())}]`).forEach(b => {
+                const on = b.dataset[attr] === val;
+                b.classList.toggle('active', on);
+                b.setAttribute('aria-pressed', on);
+            });
+        });
+
+        const outCount = sim.items.filter(it => it.kind !== 'note' && (it.state === 'out' || it.state === 'summary')).length;
+        statRead.textContent  = fmtK(sim.lastRead);
+        statTotal.textContent = fmtK(sim.totalRead);
+        statOut.textContent   = fmt(outCount);
+
+        // DOM contract for agents / tests
+        const doc = docItem();
+        const lastAnswer = sim.items.filter(it => it.source).pop() || {};
+        Object.assign(simRoot.dataset, {
+            scenario: sim.scenario, docMode: sim.docMode, docState: doc ? doc.state : 'none',
+            phase: sim.phase, turn: sim.turn, used: usedTokens(), capacity: CAPACITY, strategy: sim.strategy,
+            out: sim.items.filter(it => it.state === 'out').length,
+            summarized: sim.items.filter(it => it.state === 'summary').length,
+            summaryTokens: sim.summary ? sim.summary.tokens : 0,
+            lastRead: sim.lastRead, totalRead: sim.totalRead,
+            lastSource: lastAnswer.source || '', lastProbe: lastAnswer.probe || '',
+            reasoning: inWindow().reduce((a, it) => a + (it.visible != null ? it.tokens - it.visible : 0), 0),
+        });
+        sim.freshIds = new Set();
+    }
+
+    function applyLanguage() {
+        document.documentElement.lang = lang;
+        document.title = t('docTitle');
+        document.querySelectorAll('[data-i18n]').forEach(n => { n.textContent = t(n.dataset.i18n); });
+        document.querySelectorAll('.lang-btn').forEach(btn => {
+            const on = btn.dataset.lang === lang;
+            btn.classList.toggle('active', on);
+            btn.setAttribute('aria-pressed', on);
+        });
+        renderBudget();
+        render();
+    }
+
+    function setLanguage(l) {
+        lang = T[l] ? l : 'en';
+        saveLanguage(lang);
+        applyLanguage();
+    }
+
+    // ─── Event listeners ──────────────────────────────────────────────────────
+    sessionSlider.addEventListener('input', renderBudget);
+    nextBtn.addEventListener('click', nextTurn);
+    resetBtn.addEventListener('click', resetSim);
+    document.querySelectorAll('.probe-btn').forEach(b => b.addEventListener('click', () => ask(b.dataset.probe)));
+    document.querySelectorAll('.opt-btn[data-scenario]').forEach(b => b.addEventListener('click', () => setScenario(b.dataset.scenario)));
+    document.querySelectorAll('.opt-btn[data-doc-mode]').forEach(b => b.addEventListener('click', () => setDocMode(b.dataset.docMode)));
+    document.querySelectorAll('.opt-btn[data-strategy]').forEach(b => b.addEventListener('click', () => setStrategy(b.dataset.strategy)));
+    document.querySelectorAll('.lang-btn').forEach(b => b.addEventListener('click', () => setLanguage(b.dataset.lang)));
+    document.addEventListener('keydown', e => {
+        if (e.ctrlKey || e.metaKey || e.altKey || (e.target instanceof Element && e.target.matches('input, textarea'))) return;
+        const k = e.key.toLowerCase();
+        if (k === 'n' && !nextBtn.disabled) nextTurn();
+        else if (k === '1') ask('detail');
+        else if (k === '2') ask('global');
+        else if (k === '3') ask('memory');
+        else if (k === 'r') resetSim();
+        else return;
+        e.preventDefault();
+    });
+    window.addEventListener('resize', () => { fitSimHeight(); renderWindow(); });
+
+    // ─── Init ─────────────────────────────────────────────────────────────────
+    window.onload = () => {
+        lang = initialLanguage(T);
+        autoHideHeader(pageHeader);
+        applyLanguage();
+        if (window.lucide) lucide.createIcons();
+    };
+</script>
+
+</body>
+</html>

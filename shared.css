@@ -1,0 +1,348 @@
+/* ============================================================
+   shared.css – edulab tokens + app chrome shared by every page
+   (index.html: generation demo, context.html: context window)
+   ============================================================ */
+
+/* ============================================================
+   edulab — Colors & Type foundation
+   Fonts loaded from Google Fonts (CDN). See README "Visual
+   Foundations" for substitution notes.
+   ============================================================ */
+
+
+:root {
+  /* ---- Brand fonts ---- */
+  --font-display: 'Outfit', 'IBM Plex Sans', system-ui, sans-serif;
+  --font-sans:    'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --font-mono:    'Roboto Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* ============================================================
+     RAW COLOR TOKENS
+     ============================================================ */
+
+  /* Paper — page background is white; the sand steps are wells/alternating sections */
+  --paper:    #FFFFFF;   /* page background (white)    */
+  --paper-2:  #F5F3F0;   /* alternating section        */
+  --paper-3:  #EAE6E0;   /* deepest sand / wells       */
+  --surface:  #FFFFFF;   /* cards & sheets             */
+
+  /* Ink — warm near-black text & lines */
+  --ink:      #1C1917;   /* primary text               */
+  --ink-2:    #44403C;   /* secondary text             */
+  --ink-3:    #625B53;   /* muted / placeholder        */
+  --line:     #E0DBD3;   /* hairline borders           */
+  --line-2:   #C9C2B7; --line-strong: #857C69; /* control borders >= 3:1 */ --track: color-mix(in srgb, var(--ink) 24%, transparent);   /* stronger borders           */
+
+  /* ---- Brand: Yellow main · Blue + Green secondary · Red danger ----
+     Plain saturated colours. A "-soft" tint IS the saturated colour
+     (panels and chips are solid), "-ink" is the text colour ON it:
+     white on blue/green/red, dark ink on yellow. Never colour-on-colour
+     (no green text on green); the saturated colour itself goes only on
+     white or black. */
+
+  /* Yellow — primary (buttons, progress, values on dark panels) */
+  --yellow:      #FFD500;
+  --yellow-600:  #F0C800;  /* hover / press          */
+  --yellow-soft: #FFD500;  /* chip / panel fill      */
+  --yellow-ink:  #1C1917;  /* text on yellow         */
+
+  /* Blue — secondary (panels, chips, correct / selected state) */
+  --blue:      #1E8FC2;
+  --blue-600:  #177AA8;
+  --blue-soft: #177AA8;
+  --blue-ink:  #FFFFFF;
+
+  /* Green — secondary support (chips, success) */
+  --green:      #00A651;
+  --green-600:  #078342;
+  --green-soft: #078342;
+  --green-ink:  #FFFFFF;
+
+  /* Red — danger / important / wrong (use sparingly) */
+  --red:      #E5322D;
+  --red-600:  #C92823;
+  --red-soft: #C92823;
+  --red-ink:  #FFFFFF;
+
+  /* Grape — category tone only (first in the tone order) */
+  --grape:      #7A5AC2;
+  --grape-soft: #7A5AC2;  /* white text 5.2:1 */
+  --grape-ink:  #FFFFFF;
+
+  /* Legacy role aliases — older edulab apps use these names */
+  --marigold: var(--yellow); --marigold-600: var(--yellow-600); --marigold-soft: var(--yellow-soft); --marigold-ink: var(--yellow-ink);
+  --teal:     var(--blue);   --teal-600:     var(--blue-600);   --teal-soft:     var(--blue-soft);   --teal-ink:     var(--blue-ink);
+  --sky:      var(--green);                                     --sky-soft:      var(--green-soft);  --sky-ink:      var(--green-ink);
+  --coral:    var(--red);    --coral-600:    var(--red-600);    --coral-soft:    var(--red-soft);    --coral-ink:    var(--red-ink);
+
+  /* Play palette — subject/category colours in the kids app */
+  --play-sun:    #FFD500;
+  --play-grass:  #00A651;
+  --play-berry:  #C6478B;
+  --play-grape:  #7A5AC2;
+  --play-sky:    #1E8FC2;
+  --play-coral:  #E5322D;
+
+  /* ---- Semantic ---- */
+  --success:      #00A651;  --success-soft: #078342;  --success-ink: #FFFFFF;
+  --warning:      #FFD500;  --warning-soft: #FFD500;  --warning-ink: #1C1917;
+  --danger:       #E5322D;  --danger-soft:  #C92823;  --danger-ink:  #FFFFFF;
+  --info:         #1E8FC2;  --info-soft:    #177AA8;  --info-ink:    #FFFFFF;
+
+  /* ---- Functional aliases ---- */
+  --bg:        var(--paper);
+  --fg:        var(--ink);
+  --fg-muted:  var(--ink-2);
+  --primary:   var(--yellow);
+  --on-primary:#1C1917;      /* dark text on yellow */
+  --focus-ring: 0 0 0 2px var(--paper), 0 0 0 5px var(--ink);
+
+  /* ============================================================
+     SPACING  (4pt base)
+     ============================================================ */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 20px; --sp-6: 24px; --sp-8: 32px; --sp-10: 40px;
+  --sp-12: 48px; --sp-16: 64px; --sp-20: 80px; --sp-24: 96px;
+
+  /* ---- Radii (friendly, generous) ---- */
+  --r-xs: 6px; --r-sm: 10px; --r-md: 14px; --r-lg: 20px; --r-xl: 28px; --r-pill: 999px;
+
+  /* ---- Elevation — warm, low, soft ---- */
+  --shadow-sm: 0 1px 2px rgba(33,30,26,.10), 0 2px 6px rgba(33,30,26,.06);
+  --shadow-md: 0 6px 18px rgba(33,30,26,.12), 0 1px 3px rgba(33,30,26,.08);
+  --shadow-lg: 0 16px 40px rgba(33,30,26,.12), 0 3px 8px rgba(33,30,26,.06);
+  --shadow-primary:  0 8px 22px color-mix(in srgb, var(--yellow) 30%, transparent);
+  --shadow-marigold: var(--shadow-primary);   /* legacy alias */
+
+  /* ============================================================
+     TYPE SCALE (semantic sizes)
+     ============================================================ */
+  --display-font:  clamp(48px, 6vw, 72px);
+  --h1: 44px; --h2: 33px; --h3: 25px; --h4: 19px;
+  --body-lg: 18px; --body: 16px; --body-sm: 14px;
+  --caption: 13px; --overline: 12px;
+}
+
+/* ============================================================
+   SEMANTIC ELEMENT STYLES
+   Apply via element selectors or .edu-prose wrapper.
+   ============================================================ */
+
+.edu-display, .edu h1.display {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--display-font);
+  line-height: 1.02;
+  letter-spacing: -0.025em;
+  color: var(--ink);
+}
+.edu h1, .edu-h1 {
+  font-family: var(--font-display);
+  font-weight: 700; font-size: var(--h1);
+  line-height: 1.06; letter-spacing: -0.02em; color: var(--ink);
+}
+.edu h2, .edu-h2 {
+  font-family: var(--font-display);
+  font-weight: 600; font-size: var(--h2);
+  line-height: 1.12; letter-spacing: -0.015em; color: var(--ink);
+}
+.edu h3, .edu-h3 {
+  font-family: var(--font-display);
+  font-weight: 600; font-size: var(--h3);
+  line-height: 1.2; letter-spacing: -0.01em; color: var(--ink);
+}
+.edu h4, .edu-h4 {
+  font-family: var(--font-sans);
+  font-weight: 700; font-size: var(--h4);
+  line-height: 1.3; color: var(--ink);
+}
+.edu p, .edu-p, .edu-body {
+  font-family: var(--font-sans);
+  font-weight: 400; font-size: var(--body);
+  line-height: 1.6; color: var(--ink-2);
+}
+.edu-body-lg { font-family: var(--font-sans); font-size: var(--body-lg); line-height: 1.6; color: var(--ink-2); }
+.edu-small  { font-family: var(--font-sans); font-size: var(--body-sm); line-height: 1.5; color: var(--ink-2); }
+.edu-caption{ font-family: var(--font-sans); font-size: var(--caption); line-height: 1.45; color: var(--ink-3); }
+
+/* Overline — mono, tracked; functional labels only (never above page/section titles) */
+.edu-overline {
+  font-family: var(--font-mono);
+  font-weight: 500; font-size: var(--overline);
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--ink);
+}
+.edu code, .edu-mono {
+  font-family: var(--font-mono);
+  font-size: 0.92em; color: var(--ink);
+  background: var(--paper-3); padding: 0.12em 0.4em; border-radius: var(--r-xs);
+}
+
+/* Solid colour blocks (callouts, stat cards, chips): set background: var(--X-soft) and
+   color: var(--X-ink) on the block, add .edu-block, and every heading/paragraph inside
+   inherits that text colour instead of the default ink. */
+.edu-block, .edu-block h1, .edu-block h2, .edu-block h3, .edu-block h4, .edu-block p,
+.edu-block li, .edu-block small { color: inherit; }
+
+body.edu { background: var(--paper); color: var(--ink); font-family: var(--font-sans); }
+
+/* ============================================================
+   App styles — everything below is driven by the tokens above
+   ============================================================ */
+body { padding: 0; }
+
+/* Branded sticky header --------------------------------------------- */
+.edu-header {
+    position: sticky; top: 0; z-index: 50; width: 100%;
+    background: var(--paper);                 /* solid: the bar is a fixed edge, not a haze */
+    border-bottom: 1px solid var(--line-2);
+}
+.edu-header-inner {                           /* 1100px content + 30px gutters: same left edge as <main> */
+    max-width: 1160px; margin: 0 auto;
+    padding: 8px 30px; display: flex; align-items: center; gap: 12px;
+}
+.edu-logo { width: 64px; height: 64px; display: block; margin-right: -6px; }
+.edu-wordmark { font-family: var(--font-display); font-weight: 700; font-size: 22px; letter-spacing: -0.02em; color: var(--ink); line-height: 1; }
+
+/* Language switch — borderless sand track, active = solid yellow pill */
+.edu-seg { margin-left: auto; display: inline-flex; gap: 2px; padding: 3px; background: var(--paper-2); border-radius: var(--r-pill); }
+.edu-seg button {
+    border: none; background: transparent; padding: 7px 14px; border-radius: var(--r-pill);
+    font-family: var(--font-sans); font-weight: 600; font-size: 13px; color: var(--ink-2); cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+.edu-seg button.active { background: var(--yellow); color: var(--yellow-ink); }
+
+/* Page header ------------------------------------------------------- */
+.page-header { text-align: left; margin: 0 0 24px; padding: 0; }
+.app-title {
+    font-family: var(--font-display); font-weight: 800;
+    font-size: clamp(2.3rem, 5vw, 3.3rem); letter-spacing: -0.025em;
+    line-height: 1.05; color: var(--ink); margin: 0;
+}
+
+/* Cards ------------------------------------------------------------- */
+/* Card anatomy: --line-2 contour, stone head strip, white body */
+.edu-card { background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r-lg); box-shadow: var(--shadow-sm); overflow: hidden; }
+.card-head { display: flex; align-items: center; gap: 8px; padding: 12px 20px;
+    background: var(--paper-2); border-bottom: 1px solid var(--line); }
+.card-body { padding: 20px; }
+.card-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; padding: 10px 20px;
+    border-top: 1px dashed var(--line-2); }
+.head-meta { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.meta-label { font-family: var(--font-mono); font-size: 11px; font-weight: 500; text-transform: uppercase;
+    letter-spacing: .1em; color: var(--ink-2); white-space: nowrap; }
+
+/* Tones & icon badges -------------------------------------------- */
+.tone-grape { background: var(--grape-soft);  color: var(--grape-ink); }
+.tone-blue  { background: var(--blue-soft);   color: var(--blue-ink); }
+.tone-green { background: var(--green-soft);  color: var(--green-ink); }
+.tone-yellow{ background: var(--yellow-soft); color: var(--yellow-ink); }
+.tone-ink   { background: var(--ink);         color: var(--paper); }
+.tone-stone { background: var(--paper-3);     color: var(--ink); }
+.tone-red   { background: var(--red-soft);    color: var(--red-ink); }
+.badge { flex: none; width: 34px; height: 34px; border-radius: var(--r-sm); display: inline-grid; place-items: center; }
+.badge.tone-ink { color: var(--yellow); }
+.badge .ic { width: 18px; height: 18px; }
+.badge-sm { width: 26px; height: 26px; border-radius: var(--r-xs); }
+.badge-sm .ic { width: 15px; height: 15px; }
+
+/* Phase chip: idle / running / done (also published as data-phase) */
+.phase-chip { font-family: var(--font-mono); font-size: 11px; font-weight: 500; text-transform: uppercase;
+    letter-spacing: .1em; padding: 4px 10px; border-radius: var(--r-pill); white-space: nowrap; }
+
+/* Context legend */
+.legend-item { display: inline-flex; align-items: center; gap: 7px; }
+.swatch { width: 18px; height: 10px; border-radius: var(--r-pill); }
+
+/* Field labels: mono, uppercase, tracked */
+.field-label { font-family: var(--font-mono); font-size: 12px; font-weight: 500; text-transform: uppercase;
+    letter-spacing: .1em; color: var(--ink); flex-shrink: 0; }
+
+/* Focus: white gap + ink band, visible on yellow too */
+:focus-visible { outline: 3px solid transparent; outline-offset: 2px; box-shadow: var(--focus-ring); }
+
+/* Buttons ----------------------------------------------------------- */
+.edu-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    font-family: var(--font-display); font-weight: 600; font-size: 14px;
+    border: none; border-radius: var(--r-pill); padding: 10px 20px; cursor: pointer;
+    transition: background 0.15s, color 0.15s, transform 0.12s cubic-bezier(.32,.72,.32,1);
+}
+.edu-btn-primary { background: var(--yellow); color: var(--on-primary); box-shadow: var(--shadow-primary); }
+.edu-btn-primary:hover { background: var(--yellow-600); }
+.edu-btn-primary:active { transform: scale(.97); }
+.edu-btn-ghost { background: transparent; color: var(--ink); border: 1px solid var(--line-strong); }
+.edu-btn-ghost:hover { background: var(--paper-2); color: var(--ink); }
+.edu-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.edu-btn.done { background: var(--paper-3); color: var(--ink-2); box-shadow: none; }
+
+.fade-in { animation: fadeIn 0.45s cubic-bezier(.32,.72,.32,1); }
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.edu-card h3.card-title { font-family: var(--font-display); font-weight: 600; font-size: 18px; letter-spacing: -0.01em; color: var(--ink); }
+
+/* App + guide layout ---------------------------------------------- */
+.app-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 24px; align-items: stretch; }   /* guide column matches the app column's height */
+.app-guide { display: flex; flex-direction: column; gap: 12px; }
+.guide-card {
+    flex: 1 1 auto;                       /* cards share the column's height */
+    background: var(--surface); border: 1px solid var(--line-2);
+    border-radius: var(--r-md); box-shadow: var(--shadow-sm); overflow: hidden;
+}
+.guide-card h4 {                          /* stone head strip */
+    display: flex; align-items: center; gap: 10px; margin: 0; padding: 8px 14px;
+    background: var(--paper-2); border-bottom: 1px solid var(--line);
+    font-family: var(--font-display); font-weight: 700; font-size: 15px; color: var(--ink);
+}
+.guide-card p { margin: 0; padding: 16px 18px 18px; font-family: var(--font-sans); font-size: 16px; line-height: 1.6; color: var(--ink-2); }
+@media (max-width: 768px) {
+    .app-layout { grid-template-columns: 1fr; }
+    .card-head { flex-wrap: wrap; }
+}
+
+/* Page nav – one pill per page, active = solid yellow (same idiom as .edu-seg) */
+.edu-nav { display: inline-flex; gap: 2px; margin-left: 18px; }
+.edu-nav a {
+  padding: 7px 14px; border-radius: var(--r-pill); text-decoration: none;
+  font-family: var(--font-sans); font-weight: 600; font-size: 14px; color: var(--ink-2);
+  transition: background 0.15s, color 0.15s;
+}
+.edu-nav a:hover { background: var(--paper-2); color: var(--ink); }
+.edu-nav a[aria-current="page"] { background: var(--yellow); color: var(--yellow-ink); }
+@media (max-width: 768px) {
+  .edu-header-inner { flex-wrap: wrap; padding: 8px 16px; row-gap: 4px; }
+  .edu-nav { order: 3; flex-basis: 100%; margin-left: 0; }
+}
+
+/* Rail card: the head strip sits left of the body instead of above it (wide workbenches) */
+.edu-card.rail { display: grid; grid-template-columns: var(--rail-w, 230px) minmax(0, 1fr); }
+.edu-card.rail > .card-head {
+  grid-row: 1 / span 2; display: grid; grid-template-columns: auto minmax(0, 1fr);
+  align-content: start; align-items: center; gap: 10px;
+  padding: 16px 18px; border-bottom: none; border-right: 1px solid var(--line);
+}
+.edu-card.rail > .card-head > :nth-child(n+3) { grid-column: 1 / -1; justify-self: start; margin-left: 0; }
+.edu-card.rail > .card-body, .edu-card.rail > .card-foot { grid-column: 2; }
+
+/* Wide page: header row and content fill the viewport with a fluid side margin */
+.wide { --gutter: clamp(16px, 4vw, 72px); --rail-w: 210px; }
+.wide .app-layout { grid-template-columns: minmax(0, 1fr) clamp(320px, 26vw, 500px); }   /* guide grows with the screen: fewer lines, shorter page */
+.wide .edu-header-inner { max-width: none; padding-left: var(--gutter); padding-right: var(--gutter); }
+
+@media (max-width: 768px) {
+  .wide .app-layout { grid-template-columns: 1fr; }
+  .edu-card.rail { display: block; }
+  .edu-card.rail > .card-head { display: flex; flex-wrap: wrap; border-right: none; border-bottom: 1px solid var(--line); padding: 12px 16px; }
+  .edu-card.rail > .card-head > :nth-child(n+3) { margin-left: auto; }
+}
+
+/* Auto-hiding header (opt-in per page via autoHideHeader() in shared.js) */
+.edu-header.autohide { transition: transform 0.25s cubic-bezier(.32,.72,.32,1); }
+.edu-header.autohide.is-hidden { transform: translateY(-100%); }
+@media (prefers-reduced-motion: reduce) {
+  .edu-header.autohide { transition: none; }
+}
