@@ -215,8 +215,12 @@ body { padding: 0; }
 
 /* App title in the top bar, right after the wordmark (the page's only h1); scoped to beat ".edu h1" */
 .edu-header-inner .edu-app-title { margin: 0 0 0 14px; padding-left: 14px; border-left: 1px solid var(--line-2, #d9d3c7);
-  font-family: var(--font-display); font-weight: 600; font-size: 19px; letter-spacing: -.01em; line-height: 1.2;
+  font-family: var(--font-display); font-weight: 600; font-size: 38px; letter-spacing: -.02em; line-height: 1.1;
   color: var(--ink-2, #4a4540); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 1 auto; }
+/* bigger app title (38px) where the bar has room; step down where it would truncate */
+@media (max-width: 1341px) { .edu-header-inner .edu-app-title { font-size: 30px; } }
+@media (max-width: 1187px) { .edu-header-inner .edu-app-title { font-size: 24px; } }
+@media (max-width: 1071px) { .edu-header-inner .edu-app-title { font-size: 19px; } }
 @media (max-width: 640px) { .edu-header-inner .edu-app-title { font-size: 15px; margin-left: 10px; padding-left: 10px; } }
 /* phones: the page-nav pills already name the current page; the bar has no room for the title too */
 @media (max-width: 560px) { .edu-header-inner .edu-app-title { display: none; } }
