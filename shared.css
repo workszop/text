@@ -213,13 +213,13 @@ body { padding: 0; }
 }
 .edu-seg button.active { background: var(--yellow); color: var(--yellow-ink); }
 
-/* Page header ------------------------------------------------------- */
-.page-header { text-align: left; margin: 0 0 24px; padding: 0; }
-.app-title {
-    font-family: var(--font-display); font-weight: 800;
-    font-size: clamp(2.3rem, 5vw, 3.3rem); letter-spacing: -0.025em;
-    line-height: 1.05; color: var(--ink); margin: 0;
-}
+/* App title in the top bar, right after the wordmark (the page's only h1); scoped to beat ".edu h1" */
+.edu-header-inner .edu-app-title { margin: 0 0 0 14px; padding-left: 14px; border-left: 1px solid var(--line-2, #d9d3c7);
+  font-family: var(--font-display); font-weight: 600; font-size: 19px; letter-spacing: -.01em; line-height: 1.2;
+  color: var(--ink-2, #4a4540); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 1 auto; }
+@media (max-width: 640px) { .edu-header-inner .edu-app-title { font-size: 15px; margin-left: 10px; padding-left: 10px; } }
+/* phones: the page-nav pills already name the current page; the bar has no room for the title too */
+@media (max-width: 560px) { .edu-header-inner .edu-app-title { display: none; } }
 
 /* Cards ------------------------------------------------------------- */
 /* Card anatomy: --line-2 contour, stone head strip, white body */
