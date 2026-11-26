@@ -305,7 +305,8 @@ body { padding: 0; }
 }
 
 /* Page nav – one pill per page, active = solid yellow (same idiom as .edu-seg) */
-.edu-nav { display: inline-flex; gap: 2px; margin-left: 18px; }
+.edu-nav { display: inline-flex; gap: 2px; margin-left: auto; }   /* nav sits right, next to the language switch */
+.edu-header-inner > .edu-seg { margin-left: 12px; }
 .edu-nav a {
   padding: 7px 14px; border-radius: var(--r-pill); text-decoration: none;
   font-family: var(--font-sans); font-weight: 600; font-size: 14px; color: var(--ink-2);
@@ -316,6 +317,7 @@ body { padding: 0; }
 @media (max-width: 768px) {
   .edu-header-inner { flex-wrap: wrap; padding: 8px 16px; row-gap: 4px; }
   .edu-nav { order: 3; flex-basis: 100%; margin-left: 0; }
+  .edu-header-inner > .edu-seg { margin-left: auto; }
 }
 
 /* Rail card: the head strip sits left of the body instead of above it (wide workbenches) */
